@@ -1,0 +1,4 @@
+objects: securities, legal entities (human-beings and corporations), world (includes all previous)
+phenomena: purchase of securities between EAs (with and without third-parties), reception of dividends, modulators of 2 previous phenomena
+
+

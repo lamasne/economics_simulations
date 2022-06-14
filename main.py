@@ -1,5 +1,5 @@
 from math_functions import study_distribs
-from dynamics import generate_init_state, simulate_exchange
+from dynamics.main_fcts import generate_init_state, simulate_exchange
 
 import matplotlib.pyplot as plt
 
