@@ -1,11 +1,10 @@
 from objects.investment_bank import InvestmentBank
 from objects.market import Market
-import globals
+import meta.globals as globals
 from dynamics.other_fcts import *
 
 import pandas as pd
 from alive_progress import alive_bar
-
 
 
 def generate_init_state():

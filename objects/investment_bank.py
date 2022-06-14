@@ -1,7 +1,7 @@
 from math import floor
 from scipy import stats
 
-import globals
+import meta.globals as globals
 # from objects.ea import EA
 
 # should implement EA or company maybe?

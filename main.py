@@ -1,4 +1,4 @@
-from math_functions import study_distribs
+from meta.math_functions import study_distribs
 from dynamics.main_fcts import generate_init_state, simulate_exchange
 
 import matplotlib.pyplot as plt

@@ -1,6 +1,6 @@
 import numpy as np
 from objects.ea import EA
-import globals
+import meta.globals as globals
 from math import sqrt
 from scipy.stats import skewnorm
 
