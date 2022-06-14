@@ -1,10 +1,11 @@
-from re import A
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import seaborn as sns
 
 class Market:
+    '''
+    Entity that links orders 
+    '''
     def __init__(self, companies):
             self.bid = []
             self.ask = []

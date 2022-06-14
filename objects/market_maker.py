@@ -1,5 +1,4 @@
 import numpy as np
-from asset import Asset
 from ea import EA
 from math import sqrt
 

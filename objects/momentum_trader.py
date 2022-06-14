@@ -1,7 +1,5 @@
 import matplotlib.pyplot as plt
-import pandas_ta as ta
-
-from ea import EA
+from objects.ea import EA
 
 
 class MomentumTrader(EA):

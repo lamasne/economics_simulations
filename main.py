@@ -1,62 +1,36 @@
-import random
-import numpy as np
+from math_functions import study_distribs
+from dynamics import generate_init_state, simulate_exchange
+
 import matplotlib.pyplot as plt
-from asset import Asset
-from company import Company
-from functions import *
-from momentum_trader import MomentumTrader
-from value_inversor import ValueInversor
-from market import Market
-import pandas as pd
-from math import pi
-from parameters import *
-from public_news import get_news_real_impact
-from alive_progress import alive_bar
 
 
-# (economical) incentive (e.g. earn as much money as possible) triggers actions based on models (e.g. IRL learned patterns (including cognitive biases) and theoretical models) of each EA and input for the models (i.e. observed parameters)
-# actions limited to buy and sell for market participants. Other EA's are not always that limited, e.g. brokerage houses and market organizers
-# implement double-sided auction with price-time priority as order matching engine of the market -https://link.springer.com/chapter/10.1007/978-88-470-1766-5_5
+'''
+(economical) incentive (e.g. earn as much money as possible) triggers actions based on models (e.g. IRL learned patterns (including cognitive biases) and theoretical models) of each EA and input for the models (i.e. observed parameters)
+actions limited to buy and sell for market participants. Other EA's are not always that limited, e.g. brokerage houses and market organizers
+implement order matching engine with double-sided auction using price-time priority algorithm -https://link.springer.com/chapter/10.1007/978-88-470-1766-5_5 
+--> use df.set_index(['price', 'time)]
 
-# Specific simplifications: 
-# - Let us suppose we have two populations, both market participants: value inversors and momentum traders, each associated with a the same incentive: maximize money in 10 years but different model
-# - Value inversors believe that the market is efficient at start (i.e. each stock is worth what it is worth --> no advantage in buying/selling)
 
-# Init
-company = Company(ticker, annual_profit, nb_shares)
-market = Market([company])
+Specific simplifications: 
+- Let us suppose we have two populations, both market participants: value inversors and momentum traders, each associated with a the same incentive: maximize money in 10 years but different model
+- Value inversors believe that the market is efficient at start (i.e. each stock is worth what it is worth --> no advantage in buying/selling)
 
-undistributed_shares=[]
-for i in range(nb_shares):
-    undistributed_shares.append(Asset(ticker))
+Implement 'microservices architecture'?
+Main source of data: OECD.stats
+'''
 
-investors=[]
-for i in range(nb_investors):
-    shares_tmp = []
-    nb_shares_tmp = random.randint(0,3)
-    if len(undistributed_shares) >= nb_shares_tmp:
-        investors.append(ValueInversor(undistributed_shares[0:nb_shares_tmp]))
-        for j in range(nb_shares_tmp):
-            undistributed_shares.remove(undistributed_shares[0])
+print('Start')
 
-for j in range(2):
-    news_real_impact = get_news_real_impact(ticker)
-    print(f'FLASH NEWS: {news_real_impact}')
+# study_distribs()
 
-    with alive_bar(nb_investors, title='Get orders') as bar:
-        for i in get_orders(investors, ticker, news_real_impact, market):
-            bar()
+[market, investors] = generate_init_state() # companies included in market
 
-    market.make_bid_ask_plot()
-
-    # t = pd.date_range(start=start_time, end='2022-10-13', periods=resolution).to_frame(index=False, name='Time')
-    market.match_bid_ask(ticker)
-    print(f'Buy price: {market.get_buy_price(ticker)}\nSell price: {market.get_sell_price(ticker)}')
-
-    market.make_bid_ask_plot()
+# Simulate stock exchange
+simulate_exchange(market, investors)
 
 plt.show()
-print('end')
+
+print('End')
 
 
 # # Momentum trades
