@@ -2,5 +2,6 @@
     "python.analysis.extraPaths": [
         "./objects",
         "./dynamics"
-    ]
+    ],
+    "python.formatting.provider": "black",
 }

@@ -2,15 +2,18 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 
+
 class Market:
-    '''
-    Entity that links orders 
-    '''
-    def __init__(self, companies):
-            self.bid = []
-            self.ask = []
-            self.companies = companies
-    
+    """
+    Entity that links orders
+    """
+
+    def __init__(self, companies, name=None, id=None, bid=[], ask=[]):
+        self.id = id if id is not None else name
+        self.bid = bid
+        self.ask = ask
+        self.companies = companies
+
     def get_order_book(self):
         if self.bid:
             bid_prices = np.transpose(np.array(self.bid))[0]
@@ -19,8 +22,10 @@ class Market:
         if self.ask:
             ask_prices = np.transpose(np.array(self.ask))[0]
         else:
-            ask_prices = [0]            
-        return pd.DataFrame([[np.sort(bid_prices), np.sort(ask_prices)]], columns=['Bid', 'Ask'])
+            ask_prices = [0]
+        return pd.DataFrame(
+            [[np.sort(bid_prices), np.sort(ask_prices)]], columns=["Bid", "Ask"]
+        )
 
     def get_buy_price(self, ticker):
         supplies = self.get_supply_for_ticker(ticker)
@@ -50,19 +55,19 @@ class Market:
             ea.available_shares.remove(share)
             ea.blocked_shares.append(share)
             if not ea.blocked_shares:
-                print('ISSUE')
+                print("ISSUE")
             self.ask.append([ask, ea, share])
-    
+
     # For bid and ask lists
     def get_demand_for_ticker(self, ticker):
-        return list(filter(lambda bid: bid[2]==ticker, self.bid))
+        return list(filter(lambda bid: bid[2] == ticker, self.bid))
 
     def get_supply_for_ticker(self, ticker):
         return list(filter(lambda ask: ask[2].get_ticker() == ticker, self.ask))
 
     # Many assumptions here
     def match_bid_ask(self, ticker):
-        tol = 0.2 #percent --> 0.2 = 20 cent for 100$ stock
+        tol = 0.2  # percent --> 0.2 = 20 cent for 100$ stock
 
         demands = self.get_demand_for_ticker(ticker)
         supplies = self.get_supply_for_ticker(ticker)
@@ -78,7 +83,7 @@ class Market:
                             min = min_tmp
                             i = idx_s
 
-                if min < tol/100 * demand[0]:
+                if min < tol / 100 * demand[0]:
 
                     supply = supplies[i]
 
@@ -88,32 +93,44 @@ class Market:
                     buyer = demand[1]
                     share = supply[2]
 
-                    supplies.remove(supply) # once investor sold, his ask should be removed
+                    supplies.remove(
+                        supply
+                    )  # once investor sold, his ask should be removed
 
                     seller.sell(share, price_s)
                     buyer.buy(share, price_s)
 
                     i = 0
-                    while (self.ask[i][0] != price_s) or (self.ask[i][1] is not seller) or(self.ask[i][2] is not share):
+                    while (
+                        (self.ask[i][0] != price_s)
+                        or (self.ask[i][1] is not seller)
+                        or (self.ask[i][2] is not share)
+                    ):
                         i += 1
                     self.ask.pop(i)
-                    
+
                     i = 0
-                    while (self.bid[i][0] != price_d) or (self.bid[i][1] is not buyer) or(self.bid[i][2] != ticker):
+                    while (
+                        (self.bid[i][0] != price_d)
+                        or (self.bid[i][1] is not buyer)
+                        or (self.bid[i][2] != ticker)
+                    ):
                         i += 1
                     self.bid.pop(i)
                     # print(f'{buyer} bought {share} from {seller} for {price_s}')
 
-    def make_bid_ask_plot(self, x_label='price', y_label='quantity', title='Demand and supply curves'):
+    def make_bid_ask_plot(
+        self, x_label="price", y_label="quantity", title="Demand and supply curves"
+    ):
         order_book = self.get_order_book()
-        demand_pdf = order_book['Bid'].values[0]       
-        supply_pdf = order_book['Ask'].values[0]
-        
+        demand_pdf = order_book["Bid"].values[0]
+        supply_pdf = order_book["Ask"].values[0]
+
         # ax.hist(demand_pdf, bins=50, density=True, histtype='stepfilled', alpha=0.2) #bins = nb of separations (rectangles)
 
-        if len(demand_pdf) > 40 and len(supply_pdf) > 40:  
+        if len(demand_pdf) > 40 and len(supply_pdf) > 40:
             sns.displot([demand_pdf, supply_pdf], kde=True, bins=40)
-        elif len(demand_pdf) > 40 and len(supply_pdf) < 40:  
+        elif len(demand_pdf) > 40 and len(supply_pdf) < 40:
             sns.displot(demand_pdf, kde=True, bins=40)
-        elif len(supply_pdf) > 40 and len(demand_pdf) < 40:  
+        elif len(supply_pdf) > 40 and len(demand_pdf) < 40:
             sns.displot(supply_pdf, kde=True, bins=40)
