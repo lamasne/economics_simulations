@@ -2,7 +2,7 @@ from http import client
 import itertools
 import numpy as np
 import pandas as pd
-from pymongo import MongoClient, ReplaceOne
+from pymongo import MongoClient, UpdateOne
 import pymongo
 from objects.animate.value_investor import ValueInvestor
 import meta.globals as globals
@@ -93,12 +93,23 @@ class DB_interface:
 
         else:
             formated_data = [row for row in list(df.to_dict(orient="index").values())]
-            with alive_bar(
-                len(formated_data), title=f"Saving data in {collection_name}"
-            ) as bar:
-                for object in formated_data:
-                    collection.replace_one({"id": object[key_id]}, object, upsert=True)
-                    bar()
+
+            # # Alternative with bulk_write is almost twice faster
+            # with alive_bar(
+            #     len(formated_data), title=f"Saving data in {collection_name}"
+            # ) as bar:
+            #     for object in formated_data:
+            #         collection.replace_one({"id": object[key_id]}, object, upsert=True)
+            #         bar()
+
+            result = collection.bulk_write(
+                [
+                    UpdateOne(
+                        {"id": object[key_id]}, {"$setOnInsert": object}, upsert=True
+                    )
+                    for object in formated_data
+                ]
+            )
 
             print(
                 f"Finished {len(formated_data)} updates/insertions into collection: {collection_name}"

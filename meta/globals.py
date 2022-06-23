@@ -12,7 +12,7 @@ mongodb_settings = {"host": "localhost", "port": 27017, "db_name": "econ_simulat
 SCALING_FACTOR = 1e-6
 timespan = 2
 is_import = False  # if True generate import init state, else generate it
-is_from_scratch = False
+is_from_scratch = True
 is_save_init = True
 
 tickers = ["AAPL", "PEAR"]
