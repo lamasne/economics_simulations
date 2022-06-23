@@ -8,10 +8,10 @@ class Market:
     Entity that links orders
     """
 
-    def __init__(self, companies, name=None, id=None, bid=[], ask=[]):
+    def __init__(self, companies, name=None, id=None, bid=None, ask=None):
         self.id = id if id is not None else name
-        self.bid = bid
-        self.ask = ask
+        self.bid = bid if bid is not None else []
+        self.ask = ask if ask is not None else []
         self.companies = companies
 
     def get_order_book(self):
@@ -52,8 +52,8 @@ class Market:
     def process_ask(self, ask, ea, share):
         # relevant_shares = list(filter(lambda share : share.get_ticker() == ticker, ea.available_shares))
         if share:
-            ea.available_shares.remove(share)
-            ea.blocked_shares.append(share)
+            ea.available_shares.pop(share.id)
+            ea.blocked_shares[share.id] = share
             if not ea.blocked_shares:
                 print("ISSUE")
             self.ask.append([ask, ea, share])
@@ -63,7 +63,7 @@ class Market:
         return list(filter(lambda bid: bid[2] == ticker, self.bid))
 
     def get_supply_for_ticker(self, ticker):
-        return list(filter(lambda ask: ask[2].get_ticker() == ticker, self.ask))
+        return list(filter(lambda ask: ask[2].ticker == ticker, self.ask))
 
     # Many assumptions here
     def match_bid_ask(self, ticker):

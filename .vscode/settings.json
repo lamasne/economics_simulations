@@ -4,4 +4,6 @@
         "./dynamics"
     ],
     "python.formatting.provider": "black",
+    "window.zoomLevel": 0,
+    "editor.fontSize": 16,
 }

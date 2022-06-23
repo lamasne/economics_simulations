@@ -11,9 +11,9 @@ mongodb_settings = {"host": "localhost", "port": 27017, "db_name": "econ_simulat
 # Run params
 SCALING_FACTOR = 1e-6
 timespan = 2
-is_import = True  # if True generate import init state, else generate it
-is_from_scratch = True
-is_save_init = False
+is_import = False  # if True generate import init state, else generate it
+is_from_scratch = False
+is_save_init = True
 
 tickers = ["AAPL", "PEAR"]
 profit_inits = np.array([1e11, 2e7]) * SCALING_FACTOR  # AAPL annual net income
@@ -29,6 +29,6 @@ col2class = {
     "companies": Company,
     "shares": Share,
     "markets": Market,
-    "inverstors": ValueInvestor,
+    "investors": ValueInvestor,
     "investment_banks": InvestmentBank,
 }

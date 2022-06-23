@@ -41,8 +41,7 @@ def get_companies_df():
             "nb_shares": globals.nb_shares_inits,
         }
     )  # Maybe make it a JSON in the future (when there are more data)
-    print(f"Companies data:\n {companies_data}")
-    # print(f'Companies data in json:\n {companies_data.to_json(orient="index")}')
+    # print(f"Companies data:\n {companies_data}")
 
     return companies_data
 
@@ -88,9 +87,8 @@ def generate_investors(nb_investors, shares, companies):
     # moneys_init = stats.invgauss.rvs(c=1, d=1, scale=scale, size=nb_investors)
 
     investors = [
-        ValueInvestor(moneys_init[i], available_shares=[], id=i)
-        for i in range(nb_investors)
-    ]
+        ValueInvestor(moneys_init[i], id=i) for i in range(nb_investors)
+    ]  # init with no shares
     for company in list(companies.values()):
         company_shares = [
             share for share in list(shares.values()) if share.ticker == company.ticker

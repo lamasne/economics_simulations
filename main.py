@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import meta.globals as globals
+from meta.repository import DB_interface
 import unitary_tests as unit_test
 from dynamics.main_fcts import generate_init_state, simulate_exchange
 from meta.math_functions import study_distribs
@@ -24,12 +25,18 @@ print("\n----------------------------\nStart\n----------------------------")
 # unit_test.test_insert_df()
 # study_distribs()
 
+
 [companies, shares, markets, investors, inv_banks] = generate_init_state(
     globals.is_import, globals.is_from_scratch, globals.is_save_init
 )
 
 # Simulate stock exchange
-simulate_exchange(list(markets)[0], list(investors), list(inv_banks))
+simulate_exchange(markets["Nasdaq"], list(investors.values()), list(inv_banks.values()))
+
+try:
+    DB_interface(None)._client.close()
+except:
+    print("No connection to close")
 
 plt.show()
 

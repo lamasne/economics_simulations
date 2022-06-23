@@ -1,173 +1,258 @@
+from http import client
+import itertools
 import numpy as np
-from pandas import date_range
+import pandas as pd
 from pymongo import MongoClient, ReplaceOne
 import pymongo
+from objects.animate.value_investor import ValueInvestor
 import meta.globals as globals
 import json
 import meta.meta_functions as meta_fcts
+from alive_progress import alive_bar
 
 
-def import_objects_from_db(col_name):
-    client = _get_client()
-    db = _get_db(client)
-    col_list = db.list_collection_names()
+# singleton to only open connection once
+class DB_interface:
+    _instance = None
+    _client = None
+    _db = None
 
-    if col_name not in col_list:
-        raise Exception(f"Collection: {col_name} does not exist.")
-    else:
-        collection = db[col_name]
-        class_to_init = globals.col2class.get(col_name)
-        records = collection.find({})
-        objects = np.empty(collection.count_documents({}), dtype=class_to_init)
-        for idx, record in enumerate(records):
-            record.pop("_id")
-            raise Exception("TO IMPLEMENT: if contains _id --> import object")
-            objects[idx] = class_to_init(**record)
+    def __new__(cls, mongodb_settings):
+        if cls._instance is None:
+            cls._instance = super(DB_interface, cls).__new__(cls)
+            host = mongodb_settings["host"]
+            port = mongodb_settings["port"]
+            try:
+                cls._client = MongoClient(host, port)
+                print("Created DB interface")
+            except:
+                raise Exception("Could not connect to MongoDB")
 
-    return objects
+            db_name = mongodb_settings["db_name"]
+            cls._db = cls._client[db_name]
 
+            return cls._instance
 
-def create_collection_from_objects(
-    col_name, objects, is_from_scratch=False, key_id="id"
-):
-    """
-    Prepare init state of collection in database.
-    params:
-    - objects: list of objects
-    - is_from_scratch: if True, only insert new data, else will keep previous records as part of the new state
-    """
-    client = _get_client()
-    db = _get_db(client)
-    col_list = db.list_collection_names()
+    def create_collection_from_objects(
+        cls, col_name, objects, is_from_scratch=False, key_id="id"
+    ):
+        """
+        Prepare init state of collection in database.
+        params:
+        - objects: list of objects
+        - is_from_scratch: if True, only insert new data, else will keep previous records as part of the new state
+        """
+        col_list = cls._db.list_collection_names()
 
-    if col_name not in col_list:
-        print(f"Collection: {col_name} does not exist. It will be created")
-    elif is_from_scratch:
-        reset_collection(col_name)
-    insert_objects(col_name, objects, key_id=key_id)
+        if col_name not in col_list:
+            print(f"Collection: {col_name} does not exist. It will be created")
+        elif is_from_scratch:
+            cls.reset_collection(col_name)
+        cls.save_objects(col_name, objects, key_id=key_id)
 
+    def create_collection_from_df(
+        cls,
+        col_name,
+        data,
+        is_from_scratch=False,
+        key_id="id",
+    ):
+        """
+        Prepare init state of collection in database.
+        params:
+        - is_from_scratch: if True, only insert new data, else will keep previous records as part of the new state
+        """
+        col_list = cls._db.list_collection_names()
 
-def create_collection_from_df(
-    col_name,
-    data,
-    is_from_scratch=False,
-    key_id="id",
-):
-    """
-    Prepare init state of collection in database.
-    params:
-    - is_from_scratch: if True, only insert new data, else will keep previous records as part of the new state
-    """
-    client = _get_client()
-    db = _get_db(client)
-    col_list = db.list_collection_names()
+        if col_name not in col_list:
+            print(f"Collection: {col_name} does not exist. It will be created")
+        elif is_from_scratch:
+            cls.reset_collection(col_name)
+        cls.insert_df(col_name, data, upsert=True, key_id=key_id)
 
-    if col_name not in col_list:
-        print(f"Collection: {col_name} does not exist. It will be created")
-    elif is_from_scratch:
-        reset_collection(col_name)
-    insert_df(col_name, data, upsert=True, key_id=key_id)
+    def reset_collection(cls, collection_name):
+        collection = cls._db[collection_name]
 
+        if collection.delete_many({}):
+            print(f"Deleted all records from collection: {collection_name}")
+        else:
+            print(f"Could not delete records from collection: {collection_name}")
 
-def reset_collection(collection_name):
-    client = _get_client()
-    db = _get_db(client)
-    collection = db[collection_name]
+    def save_objects(cls, collection_name, objects, key_id):
+        collection = cls._db[collection_name]
 
-    if collection.delete_many({}):
-        print(f"Deleted all records from collection: {collection_name}")
-    else:
-        print(f"Could not delete records from collection: {collection_name}")
+        df = pd.DataFrame.from_records(
+            [vars(objects[object_key]) for object_key in objects.keys()]
+        )
+        df = cls.make_foreign_keys(df)
 
-
-def insert_objects(collection_name, objects, key_id):
-    client = _get_client()
-    db = _get_db(client)
-    collection = db[collection_name]
-
-    counter = 0
-    for key in objects.keys():
-        data_dict = vars(objects[key])
-
-        # Change attributes that are objects into references through id
-        for key in data_dict.keys():
-            for my_class in list(globals.col2class.values()):
-                # if dict check if values are objects
-                if isinstance(data_dict[key], dict) and any(
-                    isinstance(company, my_class)
-                    for company in list(data_dict[key].values())
-                ):
-                    for key2 in data_dict[key].keys():
-                        data_dict[key + "_id"] = data_dict[key]
-                        del data_dict[key]
-                        data_dict[key + "_id"][key2] = data_dict[key + "_id"][key2].id
-                # if other iterable e.g. list or tuples, check if contains any object
-                elif meta_fcts.is_iterable(data_dict[key]) and any(
-                    isinstance(company, my_class) for company in list(data_dict[key])
-                ):
-                    for idx in range(0, len(data_dict[key])):
-                        data_dict[key + "_id"] = data_dict[key]
-                        del data_dict[key]
-                        data_dict[key + "_id"][idx] = data_dict[key + "_id"][idx].id
-                # if single value, check if it is an object
-                elif isinstance(data_dict[key], my_class):
-                    data_dict[key] = data_dict[key].id
-
-        if data_dict.get(key_id) is None:
+        if any(key_id_value is None for key_id_value in df[key_id]):
             raise Exception(
                 f"key_id of data to be inserted into collection: '{collection_name}' must be defined"
             )
 
         else:
-            collection.replace_one(
-                {key_id: data_dict.get(key_id)}, data_dict, upsert=True
+            formated_data = [row for row in list(df.to_dict(orient="index").values())]
+            with alive_bar(
+                len(formated_data), title=f"Saving data in {collection_name}"
+            ) as bar:
+                for object in formated_data:
+                    collection.replace_one({"id": object[key_id]}, object, upsert=True)
+                    bar()
+
+            print(
+                f"Finished {len(formated_data)} updates/insertions into collection: {collection_name}"
             )
-            counter += 1
 
-    print(f"Finished {counter} updates/insertions into collection: {collection_name}")
-    client.close()
+    def load_objects_from_db(cls, col_name):
+        col_list = cls._db.list_collection_names()
 
+        if col_name not in col_list:
+            raise Exception(f"Collection: {col_name} does not exist.")
+        else:
+            # import all data from collection
+            collection = cls._db[col_name]
+            class_to_init = globals.col2class.get(col_name)
+            df = pd.DataFrame(list(collection.find({})))
+            df.drop("_id", axis=1, inplace=True)  # axis = 1 for column and not row
 
-def insert_df(collection_name, data_df, upsert, key_id):
-    client = _get_client()
-    db = _get_db(client)
-    collection = db[collection_name]
+            objects = {}
+            # necessary for cls.import_foreign_keys
+            col_to_import = [col for col in df.columns if col.endswith("_id")]
+            with alive_bar(
+                len(df.index), title=f"Importing data from {col_name}"
+            ) as bar:
+                for row in [df.iloc[idx] for idx in range(len(df.index))]:
+                    # If there is at least
+                    if len(col_to_import) > 0:
+                        # import secondary objects using foreign keys
+                        params = cls.import_foreign_keys(row, col_to_import)
+                    else:
+                        params = row.copy()
+                    # print(params)
+                    objects[row["id"]] = class_to_init(**params)
+                    bar()
 
-    counter = 0
+        return objects
 
-    # Option 1: Update id's that already exist
-    if upsert:
-        for index, record in data_df.iterrows():
-            if record.get(key_id) is None:
-                raise Exception(
-                    f"key_id of data to be inserted into collection: '{collection_name}' must be defined"
-                )
-            else:
-                collection.replace_one(
-                    {key_id: record.get(key_id)}, record.to_dict(), upsert=True
-                )
+    def insert_df(cls, collection_name, data_df, upsert, key_id):
+        collection = cls._db[collection_name]
+
+        counter = 0
+
+        # Option 1: Update id's that already exist
+        if upsert:
+            for index, record in data_df.iterrows():
+                if record.get(key_id) is None:
+                    raise Exception(
+                        f"key_id of data to be inserted into collection: '{collection_name}' must be defined"
+                    )
+                else:
+                    collection.replace_one(
+                        {key_id: record.get(key_id)}, record.to_dict(), upsert=True
+                    )
+                    counter += 1
+
+        # Option 2: Duplicate id's that already exist
+        else:
+            for index, record in data_df.iterrows():
+                collection.insert_one(record.to_dict())
                 counter += 1
 
-    # Option 2: Duplicate id's that already exist
-    else:
-        for index, record in data_df.iterrows():
-            collection.insert_one(record.to_dict())
-            counter += 1
+        print(f"Finished {counter} insertions into collection: {collection_name}")
 
-    print(f"Finished {counter} insertions into collection: {collection_name}")
-    client.close()
+    def make_foreign_keys(cls, df):
+        """Change fields that are objects (to be found in other collections) into list of references through id"""
 
+        for column in df.columns:
+            # check if single object
+            if not meta_fcts.is_a_compound(df[column].iloc[0]):
+                for att, my_class in itertools.product(
+                    df[column], list(globals.col2class.values())
+                ):
+                    if isinstance(att, my_class):
+                        df[column + "_id"] = [att.id for att in df[column]]
+                        df.drop(column, axis=1, inplace=True)
+                        break
+            else:
+                # if compound check if values are objects
+                for att, my_class in itertools.product(
+                    df[column], list(globals.col2class.values())
+                ):
+                    if any(
+                        isinstance(att_att, my_class)
+                        for att_att in meta_fcts.get_values_from_compound(att)
+                    ):
+                        df[column + "_id"] = [
+                            [
+                                att_att.id
+                                for att_att in meta_fcts.get_values_from_compound(att_2)
+                            ]
+                            for att_2 in df[column]
+                        ]  # assuming keys are the id
+                        df.drop(column, axis=1, inplace=True)
+                        break
 
-def _get_db(client):
-    db_name = globals.mongodb_settings["db_name"]
-    return client[db_name]
+        return df
 
+    def import_foreign_keys(cls, row, col_to_import, is_make_dict=True):
+        """
+        params:
+        - is_make_dict: is the output desired format a dictionnary? Otherwise make list
+        """
+        params = row.copy()
 
-def _get_client():
-    host = globals.mongodb_settings["host"]
-    port = globals.mongodb_settings["port"]
-    try:
-        client = MongoClient(host, port)
-    except:
-        print("Could not connect to MongoDB")
-    return client
+        # for each attribute-object to import
+        for col in col_to_import:
+
+            # get collection name and associated class
+            param_name = col[:-3]  # remove '_id'
+            if param_name in globals.col2class.keys():
+                att_collection_name = param_name
+            elif any(col_name in col for col_name in globals.col2class.keys()):
+                for col_name in globals.col2class.keys():
+                    if col_name in col:
+                        att_collection_name = col_name
+                        break
+            else:
+                raise Exception(
+                    "The variable name does not contain a valid collection name"
+                )
+            class_to_import = globals.col2class[att_collection_name]
+
+            # Get foreign key objects
+            if meta_fcts.is_a_compound(row[col]):
+                att_dicts = list(
+                    cls._db[att_collection_name].find(
+                        {"id": {"$in": [att_id for att_id in row[col]]}}
+                    )
+                )
+                att_df = pd.DataFrame(att_dicts).drop("_id", axis=1)
+                if is_make_dict:
+                    att_objects = {
+                        att_row["id"]: class_to_import(**att_row)
+                        for att_row in [
+                            att_df.iloc[idx] for idx in range(len(att_df.index))
+                        ]
+                    }
+                    if len(att_objects) < 1:
+                        print("hey")
+                else:
+                    att_objects = [
+                        class_to_import(**att_row)
+                        for att_row in [
+                            att_df.iloc[idx] for idx in range(len(att_df.index))
+                        ]
+                    ]
+            else:
+                att_dicts = cls._db[att_collection_name].find_one({"id": row[col]})
+                del att_dicts["_id"]
+                if is_make_dict:
+                    att_objects = {att_dicts[0]["id"]: class_to_import(**att_dicts[0])}
+                else:
+                    att_objects = [class_to_import(**att_dicts[0])]
+
+            del params[col]
+            params[param_name] = att_objects
+
+            return params

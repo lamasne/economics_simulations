@@ -21,8 +21,8 @@ class ValueInvestor(EA):
             available_money  # random between 10000 and 100000 maybe (or normal_dist/x)
         )
         self.blocked_money = blocked_money if blocked_money is not None else 0
-        self.available_shares = available_shares if available_shares is not None else []
-        self.blocked_shares = blocked_shares if blocked_shares is not None else []
+        self.available_shares = available_shares if available_shares is not None else {}
+        self.blocked_shares = blocked_shares if blocked_shares is not None else {}
         self.id = id
         self.accuracy = (
             accuracy
@@ -37,23 +37,23 @@ class ValueInvestor(EA):
 
     def sell(self, share, price, through_3rd_party=True):
         if through_3rd_party:
-            self.blocked_shares.remove(share)
+            self.blocked_shares.pop(share.id)
         else:
-            self.available_shares.remove(share)
+            self.available_shares.pop(share.id)
         self.available_money += price
 
     def buy(self, share, price, through_3rd_party=True):
         if through_3rd_party:
             if self.check_ability_to_pay(price, self.blocked_money):
                 self.blocked_money -= price
-                self.available_shares.append(share)
+                self.available_shares[share.id] = share
                 return 1
             else:
                 return 0
         else:
             if self.check_ability_to_pay(price, self.available_money):
                 self.available_money -= price
-                self.available_shares.append(share)
+                self.available_shares[share.id] = share
                 return 1
             else:
                 return 0
@@ -66,7 +66,7 @@ class ValueInvestor(EA):
         if self.available_money > (1 + self.greediness) * share_perceived_value:
             self.long(ticker, market, (1 - self.greediness) * share_perceived_value)
         potential_share_to_sell = list(
-            filter(lambda share: share.get_ticker() == ticker, self.available_shares)
+            filter(lambda share: share.ticker == ticker, self.available_shares.values())
         )
         if potential_share_to_sell:
             self.short(
@@ -100,7 +100,7 @@ class ValueInvestor(EA):
             company = market.companies[ticker]
             return self.compute_PE_of_interest(0) * company.get_eps()
 
-    def compute_PE_of_interest(company_type):
+    def compute_PE_of_interest(self, company_type):
         """
         Still to be implemented correctly, e.g. should depend on sector
         """
@@ -110,3 +110,5 @@ class ValueInvestor(EA):
         PE_ratio_of_interest = skewnorm.rvs(a=3, loc=typical_PE, scale=3, size=1)[
             0
         ]  # a = asymetry, loc = mu, scale = std
+
+        return typical_PE

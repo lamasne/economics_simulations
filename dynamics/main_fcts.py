@@ -1,7 +1,7 @@
 import json
 
 import meta.globals as globals
-import meta.repository as repository
+from meta.repository import DB_interface
 import pandas as pd
 from alive_progress import alive_bar
 from objects.animate.investment_bank import InvestmentBank
@@ -13,7 +13,6 @@ import meta.meta_functions as meta_fcts
 def generate_init_state(is_import=False, is_from_scratch=True, is_save_init=True):
     """
     Init all objects at time t_0
-    from then on they should be retrieved from database (and not as arguments)
     """
 
     object_types = [Company, Share, Market, ValueInvestor, InvestmentBank]
@@ -28,13 +27,14 @@ def generate_init_state(is_import=False, is_from_scratch=True, is_save_init=True
         }
     )
 
-    # import data
+    # Import data
     if is_import:
+        db_interface = DB_interface(globals.mongodb_settings)
         for idx, col_name in enumerate(df["col_name"]):
-            df.iloc[idx]["data"] = repository.import_objects_from_db(col_name)
+            df.iloc[idx]["data"] = db_interface.load_objects_from_db(col_name)
 
+    # Generate data
     else:
-        # Generate data
         companies = generate_companies("from_df", get_companies_df())
         shares = generate_shares(companies)
         markets = {"Nasdaq": Market(companies, "Nasdaq")}
@@ -45,8 +45,12 @@ def generate_init_state(is_import=False, is_from_scratch=True, is_save_init=True
 
     # Update data in db
     if not is_import and is_save_init:
+        db_interface = DB_interface(globals.mongodb_settings)
         for row in [df.iloc[idx] for idx in range(len(df.index))]:
-            repository.create_collection_from_objects(
+            # if row["col_name"] == "shares":
+            #     continue
+            # else:
+            db_interface.create_collection_from_objects(
                 row["col_name"],
                 row["data"],
                 is_from_scratch,
@@ -72,7 +76,9 @@ def simulate_exchange(market, investors, inv_banks):
     owners_of_PEAR = list(
         filter(
             lambda inv: [
-                share for share in inv.available_shares if share.ticker == "PEAR"
+                share
+                for share in inv.available_shares.values()
+                if share.ticker == "PEAR"
             ],
             investors,
         )
