@@ -10,12 +10,12 @@ from dynamics.sub_fcts import *
 import meta.meta_functions as meta_fcts
 
 
-def generate_init_state(is_import=False, is_from_scratch=True, is_save_init=True):
+def generate_init_state(is_import=False, is_save_init=True):
     """
     Init all objects at time t_0
     """
 
-    object_types = [Company, Share, Market, ValueInvestor, InvestmentBank]
+    object_types = [Company, Market, Share, ValueInvestor, InvestmentBank]
     df = pd.DataFrame(
         {
             "object_type": object_types,
@@ -31,29 +31,25 @@ def generate_init_state(is_import=False, is_from_scratch=True, is_save_init=True
     if is_import:
         db_interface = DB_interface(globals.mongodb_settings)
         for idx, col_name in enumerate(df["col_name"]):
-            df.iloc[idx]["data"] = db_interface.load_objects_from_db(col_name)
+            df.iloc[idx]["data"] = db_interface.read_collection(col_name)
 
     # Generate data
     else:
-        companies = generate_companies("from_df", get_companies_df())
-        shares = generate_shares(companies)
+        companies = generate_companies(get_companies_df())
         markets = {"Nasdaq": Market(companies, "Nasdaq")}
+        shares = generate_shares(companies)
         investors = generate_investors(globals.nb_investors, shares, companies)
         inv_banks = {name: InvestmentBank(name, 0, []) for name in ["Morgan Stanley"]}
 
-        df["data"] = [companies, shares, markets, investors, inv_banks]
+        df["data"] = [companies, markets, shares, investors, inv_banks]
 
     # Update data in db
     if not is_import and is_save_init:
         db_interface = DB_interface(globals.mongodb_settings)
         for row in [df.iloc[idx] for idx in range(len(df.index))]:
-            # if row["col_name"] == "shares":
-            #     continue
-            # else:
-            db_interface.create_collection_from_objects(
+            db_interface.update_collection(
                 row["col_name"],
                 row["data"],
-                is_from_scratch,
             )
 
     return df["data"].tolist()
@@ -73,17 +69,6 @@ def simulate_exchange(market, investors, inv_banks):
 
     # Start with IPOs
     make_IPO(market.companies["PEAR"], inv_banks, investors)
-    owners_of_PEAR = list(
-        filter(
-            lambda inv: [
-                share
-                for share in inv.available_shares.values()
-                if share.ticker == "PEAR"
-            ],
-            investors,
-        )
-    )
-    print(f"owners_of_PEAR: {owners_of_PEAR}")
 
     # Simulate one day at a time
     for j in range(timespan):
@@ -93,7 +78,7 @@ def simulate_exchange(market, investors, inv_banks):
         nb_investors = len(investors)
 
         with alive_bar(nb_investors, title="Get orders") as bar:
-            for i in get_orders(investors, ticker, news_real_impact, market):
+            for _ in get_orders(investors, ticker, news_real_impact, market):
                 bar()
 
         market.make_bid_ask_plot()
@@ -101,7 +86,7 @@ def simulate_exchange(market, investors, inv_banks):
         # t = pd.date_range(start=start_time, end='2022-10-13', periods=resolution).to_frame(index=False, name='Time')
         market.match_bid_ask(ticker)
         print(
-            f"Buy price: {market.get_buy_price(ticker)}\nSell price: {market.get_sell_price(ticker)}"
+            f"Buy price: {market.get_buy_price(ticker):.2f}\nSell price: {market.get_sell_price(ticker):.2f}"
         )
 
         market.make_bid_ask_plot()

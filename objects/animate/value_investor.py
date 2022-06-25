@@ -105,7 +105,7 @@ class ValueInvestor(EA):
         Still to be implemented correctly, e.g. should depend on sector
         """
         typical_PE = (
-            globals.capital_inits[company_type] / globals.profit_inits[company_type]
+            globals.market_cap_inits[company_type] / globals.profit_inits[company_type]
         )
         PE_ratio_of_interest = skewnorm.rvs(a=3, loc=typical_PE, scale=3, size=1)[
             0

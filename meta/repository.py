@@ -1,12 +1,8 @@
-from http import client
+import time
 import itertools
-import numpy as np
 import pandas as pd
 from pymongo import MongoClient, UpdateOne
-import pymongo
-from objects.animate.value_investor import ValueInvestor
 import meta.globals as globals
-import json
 import meta.meta_functions as meta_fcts
 from alive_progress import alive_bar
 
@@ -18,6 +14,9 @@ class DB_interface:
     _db = None
 
     def __new__(cls, mongodb_settings):
+        """
+        Create connection to db in a singleton manner
+        """
         if cls._instance is None:
             cls._instance = super(DB_interface, cls).__new__(cls)
             host = mongodb_settings["host"]
@@ -33,103 +32,41 @@ class DB_interface:
 
             return cls._instance
 
-    def create_collection_from_objects(
-        cls, col_name, objects, is_from_scratch=False, key_id="id"
-    ):
+    def update_collection(cls, col_name, data, key_id="id"):
         """
-        Prepare init state of collection in database.
+        Save objects in database, object-attributes are saved as foreign keys through their id
         params:
         - objects: list of objects
         - is_from_scratch: if True, only insert new data, else will keep previous records as part of the new state
         """
-        col_list = cls._db.list_collection_names()
-
-        if col_name not in col_list:
-            print(f"Collection: {col_name} does not exist. It will be created")
-        elif is_from_scratch:
-            cls.reset_collection(col_name)
-        cls.save_objects(col_name, objects, key_id=key_id)
-
-    def create_collection_from_df(
-        cls,
-        col_name,
-        data,
-        is_from_scratch=False,
-        key_id="id",
-    ):
-        """
-        Prepare init state of collection in database.
-        params:
-        - is_from_scratch: if True, only insert new data, else will keep previous records as part of the new state
-        """
-        col_list = cls._db.list_collection_names()
-
-        if col_name not in col_list:
-            print(f"Collection: {col_name} does not exist. It will be created")
-        elif is_from_scratch:
-            cls.reset_collection(col_name)
-        cls.insert_df(col_name, data, upsert=True, key_id=key_id)
-
-    def reset_collection(cls, collection_name):
-        collection = cls._db[collection_name]
-
-        if collection.delete_many({}):
-            print(f"Deleted all records from collection: {collection_name}")
+        if cls._db.drop_collection(cls._db[col_name]):
+            print(f"Dropped collection: {col_name}")
         else:
-            print(f"Could not delete records from collection: {collection_name}")
+            print(f"Collection: {col_name} does not exist. It will be created.")
+        data_df = cls.format_input_data(data)
+        cls.validate_data(data_df, key_id)
+        data_df = cls.make_foreign_keys(data_df)
+        formated_data = [row for row in list(data_df.to_dict(orient="index").values())]
+        collection = cls._db[col_name]
+        collection.insert_many(formated_data)
+        print(f"Updated collection: {col_name}")
 
-    def save_objects(cls, collection_name, objects, key_id):
-        collection = cls._db[collection_name]
-
-        df = pd.DataFrame.from_records(
-            [vars(objects[object_key]) for object_key in objects.keys()]
-        )
-        df = cls.make_foreign_keys(df)
-
-        if any(key_id_value is None for key_id_value in df[key_id]):
-            raise Exception(
-                f"key_id of data to be inserted into collection: '{collection_name}' must be defined"
-            )
-
-        else:
-            formated_data = [row for row in list(df.to_dict(orient="index").values())]
-
-            # # Alternative with bulk_write is almost twice faster
-            # with alive_bar(
-            #     len(formated_data), title=f"Saving data in {collection_name}"
-            # ) as bar:
-            #     for object in formated_data:
-            #         collection.replace_one({"id": object[key_id]}, object, upsert=True)
-            #         bar()
-
-            result = collection.bulk_write(
-                [
-                    UpdateOne(
-                        {"id": object[key_id]}, {"$setOnInsert": object}, upsert=True
-                    )
-                    for object in formated_data
-                ]
-            )
-
-            print(
-                f"Finished {len(formated_data)} updates/insertions into collection: {collection_name}"
-            )
-
-    def load_objects_from_db(cls, col_name):
+    def read_collection(cls, col_name):
         col_list = cls._db.list_collection_names()
-
         if col_name not in col_list:
             raise Exception(f"Collection: {col_name} does not exist.")
         else:
             # import all data from collection
-            collection = cls._db[col_name]
             class_to_init = globals.col2class.get(col_name)
+            collection = cls._db[col_name]
             df = pd.DataFrame(list(collection.find({})))
             df.drop("_id", axis=1, inplace=True)  # axis = 1 for column and not row
 
+            # import foreign keys and make objects (call constructors)
             objects = {}
-            # necessary for cls.import_foreign_keys
-            col_to_import = [col for col in df.columns if col.endswith("_id")]
+            col_to_import = [
+                col for col in df.columns if col.endswith("_id")
+            ]  # necessary for cls.import_foreign_keys
             with alive_bar(
                 len(df.index), title=f"Importing data from {col_name}"
             ) as bar:
@@ -146,38 +83,37 @@ class DB_interface:
 
         return objects
 
-    def insert_df(cls, collection_name, data_df, upsert, key_id):
-        collection = cls._db[collection_name]
-
-        counter = 0
-
-        # Option 1: Update id's that already exist
-        if upsert:
-            for index, record in data_df.iterrows():
-                if record.get(key_id) is None:
-                    raise Exception(
-                        f"key_id of data to be inserted into collection: '{collection_name}' must be defined"
-                    )
-                else:
-                    collection.replace_one(
-                        {key_id: record.get(key_id)}, record.to_dict(), upsert=True
-                    )
-                    counter += 1
-
-        # Option 2: Duplicate id's that already exist
-        else:
-            for index, record in data_df.iterrows():
-                collection.insert_one(record.to_dict())
-                counter += 1
-
-        print(f"Finished {counter} insertions into collection: {collection_name}")
+    def update_objects(cls, col_name, data, key_id):
+        """
+        updating is about a 100 times slower than inserting, so make sure that's necessary
+        """
+        data_df = cls.format_input_data(data)
+        cls.validate_data(data_df, key_id)
+        data_df = cls.make_foreign_keys(data_df)
+        formated_data = [row for row in list(data_df.to_dict(orient="index").values())]
+        print(
+            f"Updating {len(data_df.index)} objects into collection: {col_name}.\nHave you considered using update_collection()?"
+        )
+        start = time.time()
+        cls._db[col_name].bulk_write(
+            [
+                UpdateOne(
+                    {"id": object[key_id]},
+                    {"$setOnInsert": object},
+                    upsert=True,
+                )
+                for object in formated_data
+            ]
+        )
+        end = time.time()
+        print(f"Collection: {col_name} updated in {end-start:.2f} seconds")
 
     def make_foreign_keys(cls, df):
         """Change fields that are objects (to be found in other collections) into list of references through id"""
 
         for column in df.columns:
             # check if single object
-            if not meta_fcts.is_a_compound(df[column].iloc[0]):
+            if not meta_fcts.is_compound(df[column].iloc[0]):
                 for att, my_class in itertools.product(
                     df[column], list(globals.col2class.values())
                 ):
@@ -215,55 +151,69 @@ class DB_interface:
 
         # for each attribute-object to import
         for col in col_to_import:
+            param_name = col[:-3]  # remove '_id'
 
             # get collection name and associated class
-            param_name = col[:-3]  # remove '_id'
             if param_name in globals.col2class.keys():
                 att_collection_name = param_name
-            elif any(col_name in col for col_name in globals.col2class.keys()):
+            else:
                 for col_name in globals.col2class.keys():
                     if col_name in col:
                         att_collection_name = col_name
                         break
-            else:
+            if att_collection_name is None:
                 raise Exception(
                     "The variable name does not contain a valid collection name"
                 )
             class_to_import = globals.col2class[att_collection_name]
 
             # Get foreign key objects
-            if meta_fcts.is_a_compound(row[col]):
-                att_dicts = list(
-                    cls._db[att_collection_name].find(
-                        {"id": {"$in": [att_id for att_id in row[col]]}}
-                    )
+            if meta_fcts.is_compound(row[col]):
+                att_cursor = cls._db[att_collection_name].find(
+                    {"id": {"$in": [att_id for att_id in row[col]]}}, {"_id": 0}
                 )
-                att_df = pd.DataFrame(att_dicts).drop("_id", axis=1)
                 if is_make_dict:
                     att_objects = {
-                        att_row["id"]: class_to_import(**att_row)
-                        for att_row in [
-                            att_df.iloc[idx] for idx in range(len(att_df.index))
-                        ]
+                        att_dict["id"]: class_to_import(**att_dict)
+                        for att_dict in att_cursor
                     }
-                    if len(att_objects) < 1:
-                        print("hey")
                 else:
                     att_objects = [
-                        class_to_import(**att_row)
-                        for att_row in [
-                            att_df.iloc[idx] for idx in range(len(att_df.index))
-                        ]
+                        class_to_import(**att_dict) for att_dict in att_cursor
                     ]
             else:
-                att_dicts = cls._db[att_collection_name].find_one({"id": row[col]})
-                del att_dicts["_id"]
+                att_cursor = cls._db[att_collection_name].find_one(
+                    {"id": row[col]}, {"_id": 0}
+                )
                 if is_make_dict:
-                    att_objects = {att_dicts[0]["id"]: class_to_import(**att_dicts[0])}
+                    att_objects = {
+                        att_cursor[0]["id"]: class_to_import(**att_cursor[0])
+                    }
                 else:
-                    att_objects = [class_to_import(**att_dicts[0])]
+                    att_objects = [class_to_import(**att_cursor[0])]
 
             del params[col]
             params[param_name] = att_objects
 
             return params
+
+    def validate_data(cls, data, key_id):
+        if any(key_id_value is None for key_id_value in data[key_id]):
+            raise Exception(
+                f"key_id of data to be inserted into collection must be defined"
+            )
+
+    def format_input_data(cls, data):
+        """
+        if data is a list of objects, make it a dataframe. If not dataframe nor compound of objects --> Exception
+        """
+        if isinstance(data, pd.DataFrame):
+            return data
+        elif meta_fcts.is_compound(data):
+            data_list = meta_fcts.get_values_from_compound(data)
+            if any(
+                isinstance(data_list[0], my_class)
+                for my_class in globals.col2class.values()
+            ):
+                return pd.DataFrame.from_records([vars(object) for object in data_list])
+        raise Exception("Wrong format of objects to be saved")

@@ -1,20 +1,59 @@
 import pandas as pd
+from objects.animate.market import Market
+from objects.animate.investment_bank import InvestmentBank
 import meta.repository as repository
 import meta.globals as globals
+from dynamics.sub_fcts import (
+    generate_companies,
+    generate_investors,
+    generate_shares,
+    get_companies_df,
+    make_IPO,
+)
 
 
-def test_insert_df(collection_name="companies", data_df=None):
-    print("Started testing insert_df\n")
+def test_make_IPO():
+    # Get parameters
+    ticker = "PEAR"
+    companies = generate_companies(get_companies_df())
+    shares = generate_shares(companies)
+    investors = generate_investors(globals.nb_investors, shares, companies).values()
+    inv_banks = {
+        name: InvestmentBank(name, 0, []) for name in ["Morgan Stanley"]
+    }.values()
 
-    if data_df is None:
-        data_df = pd.DataFrame(
-            data={
-                "ticker": globals.tickers,
-                "profit_init": globals.profit_inits,
-                "capital_init": globals.capital_inits,
-                "nb_shares": globals.nb_shares_inits,
-            }
+    def get_owners(ticker, investors):
+        return list(
+            filter(
+                lambda inv: [
+                    share
+                    for share in inv.available_shares.values()
+                    if share.ticker == ticker
+                ],
+                investors,
+            )
         )
+
+    # Actual test
+    owners_of_PEAR_b = get_owners(ticker, investors)
+    make_IPO(companies[ticker], inv_banks, investors)
+    owners_of_PEAR_a = get_owners(ticker, investors)
+    if not owners_of_PEAR_b and len(owners_of_PEAR_a) > 0:
+        return True
+    else:
+        return False
+
+
+def test_insert_df():
+    collection_name = ("companies",)
+    data_df = pd.DataFrame(
+        data={
+            "ticker": globals.tickers,
+            "profit_init": globals.profit_inits,
+            "market_cap_init": globals.market_cap_inits,
+            "nb_shares": globals.nb_shares_inits,
+        }
+    )
 
     # Connect to collection
     client = repository._get_client()

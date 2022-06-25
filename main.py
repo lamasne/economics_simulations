@@ -22,12 +22,12 @@ print("\n----------------------------\nStart\n----------------------------")
 
 
 # # Tests
-# unit_test.test_insert_df()
+# res = unit_test.test_make_IPO()
 # study_distribs()
 
 
-[companies, shares, markets, investors, inv_banks] = generate_init_state(
-    globals.is_import, globals.is_from_scratch, globals.is_save_init
+[companies, markets, shares, investors, inv_banks] = generate_init_state(
+    globals.is_import, globals.is_save_init
 )
 
 # Simulate stock exchange

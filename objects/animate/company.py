@@ -1,25 +1,21 @@
 class Company:
-    def __init__(self, ticker, profit, capital, nb_of_shares, id=None):
+    def __init__(self, ticker, profit, market_cap, nb_of_shares, capital, id=None):
         self.ticker = ticker
         self.id = id if id is not None else ticker
         self.profit = profit  # $ per year
-        self.capital = capital
+        self.market_cap = market_cap
+        self.capital = capital  # i.e. cash
+        # nb of shares issued during IPO + subsequent share dilutions
         self.nb_of_shares = nb_of_shares
 
     def get_eps(self):
         return self.profit / self.nb_of_shares
 
     def get_PE(self):
-        return self.capital / self.profit
+        return self.market_cap / self.profit
 
-    def get_share_price(self):
-        if self.nb_of_shares > 0:
-            return self.capital / self.nb_of_shares  # assuming capital is only equity
-        else:
-            return None
-
-    def change_capital(self, amount):
-        self.capital += amount
+    def change_market_cap(self, amount):
+        self.market_cap += amount
 
     def set_nb_shares(self, nb_shares):
         self.nb_of_shares = nb_shares

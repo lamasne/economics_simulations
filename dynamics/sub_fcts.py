@@ -23,22 +23,14 @@ all the generate[...] shall become something like: from import_object_from_db
 """
 
 
-def import_from_db(collection_name, records):
-    if collection_name == "Company":
-        companies = []
-        for record in records:
-            companies.append(
-                Company(**json.loads(record))
-            )  # https://stackoverflow.com/questions/334655/passing-a-dictionary-to-a-function-as-keyword-parameters
-
-
 def get_companies_df():
     companies_data = pd.DataFrame(
         data={
             "ticker": globals.tickers,
             "profit_init": globals.profit_inits,
-            "capital_init": globals.capital_inits,
+            "market_cap_init": globals.market_cap_inits,
             "nb_shares": globals.nb_shares_inits,
+            "capital": 0,
         }
     )  # Maybe make it a JSON in the future (when there are more data)
     # print(f"Companies data:\n {companies_data}")
@@ -46,25 +38,38 @@ def get_companies_df():
     return companies_data
 
 
-def generate_companies(method, companies_data=None):
-    if method == "from_df":
+def generate_companies(data=None):
+    """
+    output: dict --> dict[company_id] = company
+    params:
+    - companies_data = Dataframe only for now
+    """
+    if isinstance(data, pd.DataFrame):
         # companies = np.empty(len(companies_data), dtype=Company)
         companies = {}
-        for i in range(len(companies_data)):
-            ticker = companies_data.iloc[i]["ticker"]
+        for i in range(len(data)):
+            ticker = data.iloc[i]["ticker"]
+            # raise Exception(
+            #     "TO IMPLEMENT: Company(dict) with dict = df.iterrow or smth"
+            # )
             companies[ticker] = Company(
                 ticker,
-                companies_data.iloc[i]["profit_init"],
-                companies_data.iloc[i]["capital_init"],
-                companies_data.iloc[i]["nb_shares"],
+                data.iloc[i]["profit_init"],
+                data.iloc[i]["market_cap_init"],
+                data.iloc[i]["nb_shares"],
+                data.iloc[i]["capital"],
             )  # private company if nb_share = 0
     else:
-        raise Exception("method not recognized")
+        raise Exception("Wrong format of input data")
 
     return companies
 
 
 def generate_shares(companies):
+    """
+    input = dict(Company): dict[company_id] = company
+    output = dict(Share): dict[share_id] = share
+    """
     # shares = np.empty(len(companies.keys()), dtype=Share)
     shares = {}
     for key in companies.keys():
@@ -77,7 +82,7 @@ def generate_shares(companies):
 
 def generate_investors(nb_investors, shares, companies):
     """
-    make capital and income based on data such as gross domestic savings
+    make market_cap and income based on data such as gross domestic savings
     comparison of fit in math_functions.study_distribs
     """
     # Get world wealth distribution
@@ -89,13 +94,14 @@ def generate_investors(nb_investors, shares, companies):
     investors = [
         ValueInvestor(moneys_init[i], id=i) for i in range(nb_investors)
     ]  # init with no shares
+
+    # Distribute shares randomly to who can afford it
     for company in list(companies.values()):
         company_shares = [
             share for share in list(shares.values()) if share.ticker == company.ticker
         ]
-        distribute_shares_randomly(
-            company_shares, investors, company.get_share_price(), company
-        )
+        price_IPO = company.market_cap / company.nb_of_shares
+        distribute_shares_randomly(company_shares, investors, price_IPO, company)
 
     return {investor.id: investor for investor in investors}
 
@@ -108,9 +114,9 @@ def make_IPO(company, inv_banks, investors):
     """
     # 1
     inv_bank = random.choice(tuple(inv_banks))  # choose inv_bank
-    [potential_capital, potential_nb_shares] = inv_bank.evaluate_company(company)
+    [potential_market_cap, potential_nb_shares] = inv_bank.evaluate_company(company)
     discount = 0.2
-    price = (1 - discount) * potential_capital / potential_nb_shares
+    price = (1 - discount) * potential_market_cap / potential_nb_shares
 
     # 2 - for now sell randomly to richest investors
 
@@ -160,7 +166,7 @@ def distribute_shares_randomly(
                     undistributed_shares[0], price, through_3rd_party=False
                 )
                 if confirm_transaction:
-                    company.change_capital(price)
+                    company.change_market_cap(price)
                     undistributed_shares.remove(undistributed_shares[0])
             unserved_investors.remove(
                 interested_investor

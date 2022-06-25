@@ -23,7 +23,7 @@ def get_key_from_value(d, val):
 #     return False
 
 
-def is_a_compound(object):
+def is_compound(object):
     if (
         isinstance(object, list)
         or isinstance(object, tuple)
@@ -37,3 +37,10 @@ def is_a_compound(object):
 
 def get_values_from_compound(object):
     return list(object.values()) if isinstance(object, dict) else object
+
+
+def my_any(condition, list_to_test):
+    for elem in list_to_test:
+        if condition(elem):
+            return True
+    return False

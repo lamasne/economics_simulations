@@ -11,13 +11,12 @@ mongodb_settings = {"host": "localhost", "port": 27017, "db_name": "econ_simulat
 # Run params
 SCALING_FACTOR = 1e-6
 timespan = 2
-is_import = False  # if True generate import init state, else generate it
-is_from_scratch = True
+is_import = True  # if True generate import init state, else generate it
 is_save_init = True
 
 tickers = ["AAPL", "PEAR"]
 profit_inits = np.array([1e11, 2e7]) * SCALING_FACTOR  # AAPL annual net income
-capital_inits = np.array([2.3e12, 0]) * SCALING_FACTOR
+market_cap_inits = np.array([2.3e12, 0]) * SCALING_FACTOR
 nb_shares_inits = np.array([1.6e10, 0]) * SCALING_FACTOR
 # nb_shares_inits = np.array([1.6e10,0],'i') * SCALING_FACTOR       -Python int too large to convert to C long
 
@@ -27,8 +26,8 @@ nb_traders = int(1e8 * SCALING_FACTOR)  # 1 percent of population
 
 col2class = {
     "companies": Company,
-    "shares": Share,
     "markets": Market,
+    "shares": Share,
     "investors": ValueInvestor,
     "investment_banks": InvestmentBank,
 }
