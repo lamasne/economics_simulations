@@ -26,17 +26,8 @@ print("\n----------------------------\nStart\n----------------------------")
 # study_distribs()
 
 
-[companies, markets, shares, investors, inv_banks] = generate_init_state(
-    globals.is_import, globals.is_save_init
-)
-
 # Simulate stock exchange
-simulate_exchange(markets["Nasdaq"], list(investors.values()), list(inv_banks.values()))
-
-try:
-    DB_interface(None)._client.close()
-except:
-    print("No connection to close")
+simulate_exchange()
 
 plt.show()
 

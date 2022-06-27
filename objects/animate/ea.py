@@ -8,5 +8,13 @@ class EA(ABC):
     #     pass
 
     @abstractmethod
-    def place_order(self):
+    def work(self):
+        pass
+
+    @abstractmethod
+    def buy(self):
+        pass
+
+    @abstractmethod
+    def sell(self):
         pass

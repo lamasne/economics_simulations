@@ -3,13 +3,7 @@ from objects.animate.market import Market
 from objects.animate.investment_bank import InvestmentBank
 import meta.repository as repository
 import meta.globals as globals
-from dynamics.sub_fcts import (
-    generate_companies,
-    generate_investors,
-    generate_shares,
-    get_companies_df,
-    make_IPO,
-)
+from dynamics.main_fcts import *
 
 
 def test_make_IPO():

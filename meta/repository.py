@@ -13,43 +13,34 @@ class DB_interface:
     _client = None
     _db = None
 
-    def __new__(cls, mongodb_settings):
+    def __new__(cls):
         """
         Create connection to db in a singleton manner
         """
+        settings = globals.mongodb_settings
         if cls._instance is None:
             cls._instance = super(DB_interface, cls).__new__(cls)
-            host = mongodb_settings["host"]
-            port = mongodb_settings["port"]
+            host = settings["host"]
+            port = settings["port"]
             try:
                 cls._client = MongoClient(host, port)
                 print("Created DB interface")
             except:
                 raise Exception("Could not connect to MongoDB")
 
-            db_name = mongodb_settings["db_name"]
+            db_name = settings["db_name"]
             cls._db = cls._client[db_name]
 
             return cls._instance
 
-    def update_collection(cls, col_name, data, key_id="id"):
-        """
-        Save objects in database, object-attributes are saved as foreign keys through their id
-        params:
-        - objects: list of objects
-        - is_from_scratch: if True, only insert new data, else will keep previous records as part of the new state
-        """
-        if cls._db.drop_collection(cls._db[col_name]):
-            print(f"Dropped collection: {col_name}")
-        else:
-            print(f"Collection: {col_name} does not exist. It will be created.")
+    def create_collection(cls, col_name, data, key_id="id"):
         data_df = cls.format_input_data(data)
         cls.validate_data(data_df, key_id)
         data_df = cls.make_foreign_keys(data_df)
         formated_data = [row for row in list(data_df.to_dict(orient="index").values())]
         collection = cls._db[col_name]
         collection.insert_many(formated_data)
-        print(f"Updated collection: {col_name}")
+        print(f"Created collection: {col_name}")
 
     def read_collection(cls, col_name):
         col_list = cls._db.list_collection_names()
@@ -82,6 +73,18 @@ class DB_interface:
                     bar()
 
         return objects
+
+    def update_collection(cls, col_name, data, key_id="id"):
+        """
+        Save objects in database, object-attributes are saved as foreign keys through their id
+        params:
+        - objects: list of objects
+        """
+        if cls._db.drop_collection(cls._db[col_name]):
+            print(f"Dropped collection: {col_name}")
+        else:
+            print(f"Collection: {col_name} does not exist. It will be created.")
+        cls.create_collection(col_name, data, key_id="id")
 
     def update_objects(cls, col_name, data, key_id):
         """

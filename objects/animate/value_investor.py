@@ -35,6 +35,33 @@ class ValueInvestor(EA):
             else abs(np.random.normal(0, 0.03, 1)[0])
         )  # how undervalued (overvalued) must the stock be to buy (sell) it, has iompact on the spread
 
+    def do(self, ticker, news, market):
+        """
+        main activities of the class
+        """
+        share_perceived_value = self.get_perceived_value(ticker, news, market)
+        if self.available_money > (1 + self.greediness) * share_perceived_value:
+            self.long(ticker, market, (1 - self.greediness) * share_perceived_value)
+
+        potential_share_to_sell = list(
+            filter(lambda share: share.ticker == ticker, self.available_shares.values())
+        )
+        if potential_share_to_sell:
+            self.short(
+                potential_share_to_sell[0],
+                market,
+                (1 + self.greediness) * share_perceived_value,
+            )
+
+        # if market.get_buy_price(ticker): # if someone interested in selling
+        #     share_current_value = market.get_buy_price(ticker)
+        #     if share_perceived_value > share_current_value:
+        #         self.long(ticker, market, (1-self.greediness)*share_perceived_value)
+        #     elif share_perceived_value < share_current_value:
+        #         self.short(ticker, market, (1+self.greediness)*share_perceived_value)
+        # else:
+        #     pass
+
     def sell(self, share, price, through_3rd_party=True):
         if through_3rd_party:
             self.blocked_shares.pop(share.id)
@@ -60,29 +87,6 @@ class ValueInvestor(EA):
 
     def check_ability_to_pay(self, price, money):
         return False if price > money else True
-
-    def place_order(self, ticker, news, market):
-        share_perceived_value = self.get_perceived_value(ticker, news, market)
-        if self.available_money > (1 + self.greediness) * share_perceived_value:
-            self.long(ticker, market, (1 - self.greediness) * share_perceived_value)
-        potential_share_to_sell = list(
-            filter(lambda share: share.ticker == ticker, self.available_shares.values())
-        )
-        if potential_share_to_sell:
-            self.short(
-                potential_share_to_sell[0],
-                market,
-                (1 + self.greediness) * share_perceived_value,
-            )
-
-        # if market.get_buy_price(ticker): # if someone interested in selling
-        #     share_current_value = market.get_buy_price(ticker)
-        #     if share_perceived_value > share_current_value:
-        #         self.long(ticker, market, (1-self.greediness)*share_perceived_value)
-        #     elif share_perceived_value < share_current_value:
-        #         self.short(ticker, market, (1+self.greediness)*share_perceived_value)
-        # else:
-        #     pass
 
     def long(self, ticker, market, price):
         market.process_bid(price, self, ticker)
