@@ -2,68 +2,18 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 
+from objects.inanimate.order import Order
+
 
 class Market:
     """
     Entity that links orders
     """
 
-    def __init__(self, companies, name=None, id=None, bid=None, ask=None):
+    def __init__(self, companies, name=None, id=None, order_book=None):
         self.id = id if id is not None else name
-        self.bid = bid if bid is not None else []
-        self.ask = ask if ask is not None else []
+        self.order_book = order_book if order_book is not None else []
         self.companies = companies
-
-    def get_order_book(self):
-        if self.bid:
-            bid_prices = np.transpose(np.array(self.bid))[0]
-        else:
-            bid_prices = [0]
-        if self.ask:
-            ask_prices = np.transpose(np.array(self.ask))[0]
-        else:
-            ask_prices = [0]
-        return pd.DataFrame(
-            [[np.sort(bid_prices), np.sort(ask_prices)]], columns=["Bid", "Ask"]
-        )
-
-    def get_buy_price(self, ticker):
-        supplies = self.get_supply_for_ticker(ticker)
-        if supplies:
-            price = np.array(supplies).transpose()[0]
-            return price[0]
-        else:
-            return 0
-
-    def get_sell_price(self, ticker):
-        demands = self.get_demand_for_ticker(ticker)
-        if demands:
-            price = np.array(demands).transpose()[0]
-            return price[0]
-        else:
-            return 0
-
-    def process_bid(self, bid, ea, ticker):
-        if ea.available_money > bid:
-            ea.available_money -= bid
-            ea.blocked_money += bid
-            self.bid.append([bid, ea, ticker])
-
-    def process_ask(self, ask, ea, share):
-        # relevant_shares = list(filter(lambda share : share.get_ticker() == ticker, ea.available_shares))
-        if share:
-            ea.available_shares.pop(share.id)
-            ea.blocked_shares[share.id] = share
-            if not ea.blocked_shares:
-                print("ISSUE")
-            self.ask.append([ask, ea, share])
-
-    # For bid and ask lists
-    def get_demand_for_ticker(self, ticker):
-        return list(filter(lambda bid: bid[2] == ticker, self.bid))
-
-    def get_supply_for_ticker(self, ticker):
-        return list(filter(lambda ask: ask[2].ticker == ticker, self.ask))
 
     # Many assumptions here
     def match_bid_ask(self, ticker):
@@ -72,26 +22,28 @@ class Market:
         demands = self.get_demand_for_ticker(ticker)
         supplies = self.get_supply_for_ticker(ticker)
 
-        for idx_d, demand in enumerate(demands):
+        for demand in demands:
             if supplies:
-                min = demand[0]
-                i = 0
-                for idx_s, supply in enumerate(supplies):
-                    if demand[0] > supply[0]:
-                        min_tmp = abs(demand[0] - supply[0])
+                min = demand.price
+                min_id = 0
+                for supply in supplies:
+                    if demand.price > supply.price:
+                        min_tmp = abs(demand.price - supply.price)
                         if min_tmp < min:
                             min = min_tmp
-                            i = idx_s
+                            min_id = supply.id
 
-                if min < tol / 100 * demand[0]:
+                if min < tol / 100 * demand.price:
 
-                    supply = supplies[i]
+                    supply = list(filter(lambda supply: supply.id == min_id, supplies))[
+                        0
+                    ]
 
-                    price_s = supply[0]
-                    price_d = demand[0]
-                    seller = supply[1]
-                    buyer = demand[1]
-                    share = supply[2]
+                    price_s = supply.price
+                    price_d = demand.price
+                    seller = supply.offeror
+                    buyer = demand.offeror
+                    share = supply.share
 
                     supplies.remove(
                         supply
@@ -100,31 +52,79 @@ class Market:
                     seller.sell(share, price_s)
                     buyer.buy(share, price_s)
 
-                    i = 0
-                    while (
-                        (self.ask[i][0] != price_s)
-                        or (self.ask[i][1] is not seller)
-                        or (self.ask[i][2] is not share)
+                    for elem in list(
+                        filter(
+                            lambda order: order.id == demand.id
+                            or order.id == supply.id,
+                            self.order_book,
+                        )
                     ):
-                        i += 1
-                    self.ask.pop(i)
-
-                    i = 0
-                    while (
-                        (self.bid[i][0] != price_d)
-                        or (self.bid[i][1] is not buyer)
-                        or (self.bid[i][2] != ticker)
-                    ):
-                        i += 1
-                    self.bid.pop(i)
+                        self.order_book.remove(elem)
                     # print(f'{buyer} bought {share} from {seller} for {price_s}')
+
+    def process_bid(self, bid, ea, ticker):
+        if ea.available_money > bid:
+            ea.available_money -= bid
+            ea.blocked_money += bid
+            self.order_book.append(Order(ticker, "buy", bid, ea, self))
+
+    def process_ask(self, ask, ea, share):
+        # relevant_shares = list(filter(lambda share : share.get_ticker() == ticker, ea.available_shares))
+        if share:
+            ea.available_shares.pop(share.id)
+            ea.blocked_shares[share.id] = share
+            if not ea.blocked_shares:
+                print("ISSUE")
+            self.order_book.append(
+                Order(share.ticker, "sell", ask, ea, self, share=share)
+            )
+
+    def get_buy_price(self, ticker):
+        supplies = [order.price for order in self.get_supply_for_ticker(ticker)]
+        if supplies:
+            return supplies[0]
+        else:
+            return 0
+
+    def get_sell_price(self, ticker):
+        demands = [order.price for order in self.get_supply_for_ticker(ticker)]
+        if demands:
+            price = demands[0]
+        else:
+            return 0
+
+    # For bid and ask lists
+    def get_demand_for_ticker(self, ticker):
+        return list(
+            filter(
+                lambda order: order.ticker == ticker and order.order_type == "buy",
+                self.order_book,
+            )
+        )
+
+    def get_supply_for_ticker(self, ticker):
+        return list(
+            filter(
+                lambda order: order.ticker == ticker and order.order_type == "sell",
+                self.order_book,
+            )
+        )
 
     def make_bid_ask_plot(
         self, x_label="price", y_label="quantity", title="Demand and supply curves"
     ):
-        order_book = self.get_order_book()
-        demand_pdf = order_book["Bid"].values[0]
-        supply_pdf = order_book["Ask"].values[0]
+
+        demand_pdf = []
+        supply_pdf = []
+        for order in self.order_book:
+            if order.order_type == "buy":
+                demand_pdf.append(order.price)
+            elif order.order_type == "sell":
+                supply_pdf.append(order.price)
+            else:
+                raise Exception(
+                    f"Order type should be either buy or sell, not {order.order_type}"
+                )
 
         # ax.hist(demand_pdf, bins=50, density=True, histtype='stepfilled', alpha=0.2) #bins = nb of separations (rectangles)
 

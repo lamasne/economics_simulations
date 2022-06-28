@@ -35,11 +35,13 @@ class ValueInvestor(EA):
             else abs(np.random.normal(0, 0.03, 1)[0])
         )  # how undervalued (overvalued) must the stock be to buy (sell) it, has iompact on the spread
 
-    def do(self, ticker, news, market):
+    def react_to_news(self, news, market):
         """
         main activities of the class
+        NOTE: ticker and market should be included in param: news <-- ticker already solved
         """
-        share_perceived_value = self.get_perceived_value(ticker, news, market)
+        ticker = news["ticker"]
+        share_perceived_value = self.get_perceived_value(ticker, news["impact"], market)
         if self.available_money > (1 + self.greediness) * share_perceived_value:
             self.long(ticker, market, (1 - self.greediness) * share_perceived_value)
 

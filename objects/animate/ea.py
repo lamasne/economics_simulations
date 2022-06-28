@@ -8,10 +8,6 @@ class EA(ABC):
     #     pass
 
     @abstractmethod
-    def work(self):
-        pass
-
-    @abstractmethod
     def buy(self):
         pass
 

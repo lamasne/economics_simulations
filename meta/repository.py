@@ -86,6 +86,20 @@ class DB_interface:
             print(f"Collection: {col_name} does not exist. It will be created.")
         cls.create_collection(col_name, data, key_id="id")
 
+    def read_objects(cls, col_name, condition):
+        col_list = cls._db.list_collection_names()
+        if col_name not in col_list:
+            raise Exception(f"Collection: {col_name} does not exist.")
+        else:
+            class_to_init = globals.col2class.get(col_name)
+            collection = cls._db[col_name]
+            df = pd.DataFrame(list(collection.find({condition}, {"_id": 0})))
+            objects = {}
+            for row in list(df.to_dict(orient="index").values()):
+                objects[row["id"]] = class_to_init(**row)
+
+        return objects
+
     def update_objects(cls, col_name, data, key_id):
         """
         updating is about a 100 times slower than inserting, so make sure that's necessary

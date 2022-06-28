@@ -1,9 +1,11 @@
+import os
 import matplotlib.pyplot as plt
 import meta.globals as globals
 from meta.repository import DB_interface
 import unitary_tests as unit_test
 from dynamics.main_fcts import generate_init_state, simulate_exchange
 from meta.math_functions import study_distribs
+import meta.meta_functions as meta_fcts
 
 """
 Documentation in folder ./documentation
@@ -28,6 +30,13 @@ print("\n----------------------------\nStart\n----------------------------")
 
 # Simulate stock exchange
 simulate_exchange()
+
+# Print into pdf
+meta_fcts.multipage(
+    os.path.normpath(
+        "C:/Users/Lamas/workspace/PROJECTS/economics/simulation/outputs/multipage.pdf"
+    )
+)
 
 plt.show()
 

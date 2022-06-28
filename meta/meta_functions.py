@@ -1,5 +1,7 @@
 import meta.globals as globals
 import numpy as np
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
 
 
 def get_key_from_value(d, val):
@@ -44,3 +46,12 @@ def my_any(condition, list_to_test):
         if condition(elem):
             return True
     return False
+
+
+def multipage(filename, figs=None, dpi=200):
+    pp = PdfPages(filename)
+    if figs is None:
+        figs = [plt.figure(n) for n in plt.get_fignums()]
+    for fig in figs:
+        fig.savefig(pp, format="pdf")
+    pp.close()

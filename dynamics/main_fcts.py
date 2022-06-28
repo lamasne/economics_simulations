@@ -37,8 +37,8 @@ def simulate_exchange():
     market = markets["Nasdaq"]
     inv_banks = list(inv_banks.values())
     investors = list(investors.values())
-    ticker = companies["AAPL"].ticker
 
+    ticker = "AAPL"
     # Start with IPOs
 
     make_IPO(
@@ -49,21 +49,11 @@ def simulate_exchange():
 
     # Simulate one day at a time
     for _ in range(globals.timespan):
-        news_real_impact = get_news_real_impact(ticker)
+        news_real_impact = get_news_real_impact()
         print(f"FLASH NEWS: {news_real_impact}")
-
-        nb_investors = len(investors)
-
-        # f = lambda investor: investor.place_order(ticker, news_real_impact, market)
-        # def match_orders_with_time(period):
-        #     market.match_bid_ask(ticker)
-        #     time.sleep(2)
-        # with concurrent.futures.ThreadPoolExecutor() as orders_executor:
-        #     orders_executor.map(f, investors)
-        #     orders_executor.submit(match_orders_with_time)
-
-        with alive_bar(nb_investors, title="Get orders") as bar:
-            for _ in make_orders(investors, ticker, news_real_impact, market):
+        with alive_bar(len(investors), title="Get orders") as bar:
+            for investor in investors:
+                investor.react_to_news(news_real_impact, market)
                 bar()
 
         market.make_bid_ask_plot()
@@ -71,7 +61,8 @@ def simulate_exchange():
         # t = pd.date_range(start=start_time, end='2022-10-13', periods=resolution).to_frame(index=False, name='Time')
         market.match_bid_ask(ticker)
         print(
-            f"Buy price: {market.get_buy_price(ticker):.2f}\nSell price: {market.get_sell_price(ticker):.2f}"
+            f"Buy price: {market.get_buy_price(ticker)}\
+                \nSell price: {market.get_sell_price(ticker)}"
         )
 
         market.make_bid_ask_plot()
@@ -275,13 +266,7 @@ def distribute_shares_randomly(
     # print(len(shares))
 
 
-def make_orders(investors, ticker, news_real_impact, market):
-    for investor in investors:
-        investor.work(ticker, news_real_impact, market)
-        yield
-
-
-def get_news_real_impact(ticker):
+def get_news_real_impact():
     """
     returns the best prediction of impact on the company's profit in 1 year (
     i.e. returns: \tilde{profit}(t+1) / profit(t)
@@ -291,4 +276,7 @@ def get_news_real_impact(ticker):
     """
     mu = 1
     sigma = 0.1
-    return np.random.normal(mu, sigma, 1)[0]
+    news = {}
+    news["impact"] = np.random.normal(mu, sigma, 1)[0]
+    news["ticker"] = "AAPL"
+    return news
