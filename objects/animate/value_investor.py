@@ -36,7 +36,7 @@ class ValueInvestor(EA, Collectionable):
         self.accuracy = (
             accuracy
             if accuracy is not None
-            else 0.05 + abs(np.random.normal(0.15, 0.3, 1)[0])
+            else 0.05 + abs(np.random.normal(0.15, 0.25, 1)[0])
         )  # to estimate impact of news on value. Assumption: cant be less than 5% for human are limited and 20% on average
         self.greediness = 0
         # self.greediness = (
@@ -122,11 +122,14 @@ class ValueInvestor(EA, Collectionable):
         news_estimated_impact = np.random.normal(
             news["impact"], sqrt(self.accuracy) / 2, 1
         )[0]
-        if market.get_buy_price(ticker):
-            return news_estimated_impact * market.get_buy_price(ticker)
-        else:
-            company = Dao().read_objects(Company, [ticker])[ticker]
-            return self.compute_PE_of_interest(0) * company.get_eps()
+        # if market.get_buy_price(ticker):
+        #     return news_estimated_impact * market.get_buy_price(ticker)
+        # else:
+        company = Dao().read_objects(Company, [ticker])[ticker]
+        new_eps = (
+            company.get_eps() * news_estimated_impact
+        )  # Assuming the news_impact multiplies the future profit
+        return self.compute_PE_of_interest(0) * new_eps
 
     def compute_PE_of_interest(self, company_type):
         """

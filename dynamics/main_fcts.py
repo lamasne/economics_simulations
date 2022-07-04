@@ -70,10 +70,7 @@ def simulate_exchange():
         market.make_bid_ask_plot()
         # t = pd.date_range(start=start_time, end='2022-10-13', periods=resolution).to_frame(index=False, name='Time')
         market.match_bid_ask(ticker)
-        print(
-            f"Buy price: {market.get_buy_price(ticker)}\
-                \nSell price: {market.get_sell_price(ticker)}"
-        )
+        print(f"Best price: {market.get_buy_price(ticker)}")
         market.make_bid_ask_plot()
 
 

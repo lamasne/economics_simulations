@@ -3,7 +3,7 @@ import numpy as np
 # Run params
 SCALING_FACTOR = 1e-7
 timespan = 2
-is_import = False  # if True generate import init state, else generate it
+is_import = True  # if True generate import init state, else generate it
 
 
 tickers = ["AAPL", "PEAR"]

@@ -35,13 +35,9 @@ print("\n----------------------------\nStart\n----------------------------")
 # mu = 0.15
 # scale = 0.1
 # r1 = np.random.normal(mu, scale, 1000)
-
 # params_1 = stats.norm.fit(r1)
-
 # x = np.linspace(mu - 10 * scale, mu + 10 * scale, 1000)
-
 # plt.plot(x, abs(0.05 + [stats.norm.pdf(x, *params_1)][0]))
-
 # plt.show()
 
 

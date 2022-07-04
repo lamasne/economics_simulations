@@ -1,1 +1,1 @@
-{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"f8b155c6ae664da59575107c8c0a4fc9","collectionName":"investment_banks","type":"collection"}
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"1471c4c3857949e685c18fcfa68ef6f1","collectionName":"investment_banks","type":"collection"}

@@ -84,16 +84,9 @@ class Market(Collectionable):
             self.save()
 
     def get_buy_price(self, ticker):
-        supplies = [order.price for order in self.get_supply_for_ticker(ticker)]
+        supplies = market_repo.MarketRepo().query_ordered_supply(ticker, self.id)
         if supplies:
-            return supplies[0]
-        else:
-            return 0
-
-    def get_sell_price(self, ticker):
-        demands = [order.price for order in self.get_demand_for_ticker(ticker)]
-        if demands:
-            return demands[0]
+            return supplies[0]["price"]
         else:
             return 0
 
