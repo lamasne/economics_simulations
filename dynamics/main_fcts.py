@@ -1,13 +1,15 @@
+import db_interface.market_repo
+import sys
 import time
 import concurrent.futures  # multi threading/processing
-from meta.repository import DB_interface
+from db_interface.dao_MongoDB import Dao
 import meta.meta_functions as meta_fcts
 from objects.animate.investment_bank import InvestmentBank
 from objects.animate.company import Company
 from objects.animate.market import Market
 from objects.inanimate.share import Share
 from objects.animate.value_investor import ValueInvestor
-import meta.globals as globals
+import model_settings as model_settings
 import numpy as np
 import pandas as pd
 import random
@@ -19,6 +21,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import statistics
 import json
+import os
 
 
 def simulate_exchange():
@@ -30,98 +33,102 @@ def simulate_exchange():
     """
 
     # Initialize objects/parameters
-    [companies, markets, _, investors, inv_banks] = generate_init_state(
-        globals.is_import, globals.is_save_init
-    )
+    if not model_settings.is_import:
+        Dao().drop_db()
+        print("Dropped database")
+        generate_init_state()
 
-    market = markets["Nasdaq"]
-    inv_banks = list(inv_banks.values())
-    investors = list(investors.values())
+        # CREATE INDEX
 
-    ticker = "AAPL"
+        Dao().backup_db()
+    else:
+        Dao().restore_backup()
+
+    print("\n")
+
+    db_interface.market_repo.MarketRepo().create_index_match_making()
+
     # Start with IPOs
-
-    make_IPO(
-        companies["PEAR"],
-        inv_banks,
-        investors,
-    )
+    make_IPO()
+    # sys.exit()
 
     # Simulate one day at a time
-    for _ in range(globals.timespan):
-        news_real_impact = get_news_real_impact()
+    for _ in range(model_settings.timespan):
+        news_real_impact = get_news()
         print(f"FLASH NEWS: {news_real_impact}")
+
+        investors = Dao().read_collection(ValueInvestor)
         with alive_bar(len(investors), title="Get orders") as bar:
-            for investor in investors:
-                investor.react_to_news(news_real_impact, market)
+            for investor in investors.values():
+                investor.react_to_news(news_real_impact)
                 bar()
 
-        market.make_bid_ask_plot()
+        # For now focus on AAPL in Nasdaq because (studied news is about this ticker-market pair)
+        market = Dao().read_objects(Market, ["Nasdaq"])["Nasdaq"]
+        ticker = "AAPL"
 
+        market.make_bid_ask_plot()
         # t = pd.date_range(start=start_time, end='2022-10-13', periods=resolution).to_frame(index=False, name='Time')
         market.match_bid_ask(ticker)
         print(
             f"Buy price: {market.get_buy_price(ticker)}\
                 \nSell price: {market.get_sell_price(ticker)}"
         )
-
         market.make_bid_ask_plot()
 
 
-def generate_init_state(is_import=False, is_save_init=True):
+def generate_init_state():
     """
-    Init all objects at time t_0
+    Init all objects at time t_0 in the db
     """
-
+    # Define what has to be initialized <-- change by object_types = globals.col2class.values()?
     object_types = [Company, Market, Share, ValueInvestor, InvestmentBank]
+
+    companies = generate_companies(get_companies_df())
+    markets = {"Nasdaq": Market(list(companies.keys()), "Nasdaq")}
+    shares = generate_shares(companies)
+    investors = generate_investors(model_settings.nb_investors, shares, companies)
+    inv_banks = {name: InvestmentBank(name, 0, []) for name in ["Morgan Stanley"]}
+
     df = pd.DataFrame(
         {
             "object_type": object_types,
-            "col_name": [
-                meta_fcts.get_key_from_value(globals.col2class, object_type)
-                for object_type in object_types
-            ],
-            "data": None,
+            "data": [companies, markets, shares, investors, inv_banks],
         }
     )
 
-    # Import data
-    if is_import:
-        db_interface = DB_interface()
-        for idx, col_name in enumerate(df["col_name"]):
-            df.iloc[idx]["data"] = db_interface.read_collection(col_name)
-
-    # Generate data
-    else:
-        companies = generate_companies(get_companies_df())
-        markets = {"Nasdaq": Market(companies, "Nasdaq")}
-        shares = generate_shares(companies)
-        investors = generate_investors(globals.nb_investors, shares, companies)
-        inv_banks = {name: InvestmentBank(name, 0, []) for name in ["Morgan Stanley"]}
-
-        df["data"] = [companies, markets, shares, investors, inv_banks]
+    # Generate data MUST MATCH list object_types
+    check_init_state(df["data"].to_list(), object_types)
 
     # Update data in db
-    if not is_import and is_save_init:
-        db_interface = DB_interface()
-        db_interface._client.drop_database(globals.mongodb_settings["db_name"])
-        print("Dropped whole database")
-        for row in [df.iloc[idx] for idx in range(len(df.index))]:
-            db_interface.create_collection(
-                row["col_name"],
-                row["data"],
-            )
+    db_interface = Dao()
+    db_interface.drop_db()
+    print("Dropped whole database")
+    for row in [df.iloc[idx] for idx in range(len(df.index))]:
+        db_interface.create_objects(
+            row["object_type"],
+            row["data"],
+        )
 
-    return df["data"].tolist()
+
+def check_init_state(data_generated, data_to_generate):
+    """If data generated do not match object_types, return error"""
+    if len(data_generated) != len(data_to_generate):
+        raise Exception("Not all collections have been initialized (or too many)")
+    if not all(
+        isinstance(list(data_generated[i].values())[0], object_type)
+        for i, object_type in enumerate(data_to_generate)
+    ):
+        raise Exception("Mismatch between collections required and data generated")
 
 
 def get_companies_df():
     companies_data = pd.DataFrame(
         data={
-            "ticker": globals.tickers,
-            "profit_init": globals.profit_inits,
-            "market_cap_init": globals.market_cap_inits,
-            "nb_shares": globals.nb_shares_inits,
+            "ticker": model_settings.tickers,
+            "profit_init": model_settings.profit_inits,
+            "market_cap_init": model_settings.market_cap_inits,
+            "nb_shares": model_settings.nb_shares_inits,
             "capital": 0,
         }
     )  # Maybe make it a JSON in the future (when there are more data)
@@ -196,12 +203,19 @@ def generate_investors(nb_investors, shares, companies):
     return {investor.id: investor for investor in investors}
 
 
-def make_IPO(company, inv_banks, investors):
+def make_IPO():
     """Generate initial public offering
     1. Evalutation of company by underwriter, e.g. Morgan Stanley --> initial S-1 with SEC
     2. Evaluation of investors demand for shares by underwriter (shares sold at price 1 discounted) with marketing (Roadshow) --> Update S-1
     3. Price discovery (first investors to sell to other investors)
     """
+
+    # Import objects
+    db_interface = Dao()
+    company = db_interface.read_collection(Company)["PEAR"]
+    inv_banks = list(db_interface.read_collection(InvestmentBank).values())
+    investors = list(db_interface.read_collection(ValueInvestor).values())
+
     # 1
     inv_bank = random.choice(tuple(inv_banks))  # choose inv_bank
     [potential_market_cap, potential_nb_shares] = inv_bank.evaluate_company(company)
@@ -209,11 +223,12 @@ def make_IPO(company, inv_banks, investors):
     price = (1 - discount) * potential_market_cap / potential_nb_shares
 
     # 2 - for now sell randomly to richest investors
-
     shares = [
         Share(company.ticker + "_" + str(i), company.ticker)
         for i in range(potential_nb_shares)
     ]
+    db_interface.create_objects(Share, shares)
+
     company.set_nb_shares(potential_nb_shares)
 
     money_threshold_top_5 = np.percentile(
@@ -242,31 +257,33 @@ def distribute_shares_randomly(
         investor for investor in investors
     ]  # not just shares because I want to keep a copy of share
 
-    while len(undistributed_shares) > 0:
-        if len(unserved_investors) < 1:
-            unserved_investors = [
-                investor for investor in investors
-            ]  # if all have been served, start again the round
-        idx_interested_investor = random.randint(0, len(unserved_investors) - 1)
-        interested_investor = unserved_investors[idx_interested_investor]
-        nb_shares_tmp = random.randint(0, 3)
-        if len(undistributed_shares) >= nb_shares_tmp:
-            for i in range(nb_shares_tmp):
-                confirm_transaction = interested_investor.buy(
-                    undistributed_shares[0], price, through_3rd_party=False
-                )
-                if confirm_transaction:
-                    company.change_market_cap(price)
-                    undistributed_shares.remove(undistributed_shares[0])
-            unserved_investors.remove(
-                interested_investor
-            )  # to avoid giving the same investor the opportunity to buy too many shares
+    with alive_bar(len(undistributed_shares), title="Distribute shares to rich") as bar:
+        while len(undistributed_shares) > 0:
+            if len(unserved_investors) < 1:
+                unserved_investors = [
+                    investor for investor in investors
+                ]  # if all have been served, start again the round
+            idx_interested_investor = random.randint(0, len(unserved_investors) - 1)
+            interested_investor = unserved_investors[idx_interested_investor]
+            nb_shares_tmp = random.randint(0, 3)
+            if len(undistributed_shares) >= nb_shares_tmp:
+                for i in range(nb_shares_tmp):
+                    confirm_transaction = interested_investor.buy(
+                        undistributed_shares[0].id, price, through_3rd_party=False
+                    )
+                    if confirm_transaction:
+                        company.change_market_cap(price)
+                        undistributed_shares.remove(undistributed_shares[0])
+                        bar()
+                unserved_investors.remove(
+                    interested_investor
+                )  # to avoid giving the same investor the opportunity to buy too many shares
 
     # print(len(undistributed_shares))
     # print(len(shares))
 
 
-def get_news_real_impact():
+def get_news():
     """
     returns the best prediction of impact on the company's profit in 1 year (
     i.e. returns: \tilde{profit}(t+1) / profit(t)
@@ -278,5 +295,6 @@ def get_news_real_impact():
     sigma = 0.1
     news = {}
     news["impact"] = np.random.normal(mu, sigma, 1)[0]
+    news["market_id"] = "Nasdaq"
     news["ticker"] = "AAPL"
     return news

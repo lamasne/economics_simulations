@@ -3,9 +3,9 @@ from objects.animate.ea import EA
 
 
 class MomentumTrader(EA):
-    def __init__(self, id=None):
+    def __init__(self, shares_fk=None, id=None):
         self.id = id
-        self.shares = []
+        self.shares_fk = shares_fk if shares_fk is not None else []
         self.money = 1000  # random between 10000 and 100000 maybe
 
     def place_order(self, short_or_sell, share):

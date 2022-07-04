@@ -1,10 +1,13 @@
-import meta.globals as globals
+import model_settings as model_settings
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 
 
 def get_key_from_value(d, val):
+    """
+    revert dict, was necessary when class2col didnt exist (but only col2class) from globals
+    """
     keys_list = [k for k, v in d.items() if v == val]
     if len(keys_list) == 0:
         raise Exception("Value not found in dictionnary")

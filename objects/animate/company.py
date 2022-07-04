@@ -1,4 +1,9 @@
-class Company:
+from objects.collectionable import Collectionable
+from db_interface.dao_MongoDB import Dao
+import model_settings as model_settings
+
+
+class Company(Collectionable):
     def __init__(self, ticker, profit, market_cap, nb_of_shares, capital, id=None):
         self.ticker = ticker
         self.id = id if id is not None else ticker
@@ -16,6 +21,8 @@ class Company:
 
     def change_market_cap(self, amount):
         self.market_cap += amount
+        self.save()
 
     def set_nb_shares(self, nb_shares):
         self.nb_of_shares = nb_shares
+        self.save()

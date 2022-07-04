@@ -1,8 +1,12 @@
+import numpy as np
+from scipy import stats
+
+import pymongo
 import os
 import matplotlib.pyplot as plt
-import meta.globals as globals
-from meta.repository import DB_interface
-import unitary_tests as unit_test
+import model_settings as model_settings
+
+# import unitary_tests as unit_test
 from dynamics.main_fcts import generate_init_state, simulate_exchange
 from meta.math_functions import study_distribs
 import meta.meta_functions as meta_fcts
@@ -12,9 +16,9 @@ Documentation in folder ./documentation
 
 To do:
 - implement order matching engine with double-sided auction using price-time priority algorithm -https://link.springer.com/chapter/10.1007/978-88-470-1766-5_5 
---> use df.set_index(['price', 'time)]
+--> make it run in parallel with the investors' simulation by using 'multiprocess'
 
-- Implement 'microservices architecture'?
+- the blocked_shares, available_shares should be properties of share, not valueInvestor and be blocked by market, not investor
 
 - Main source of data: OECD.stats
 """
@@ -26,6 +30,19 @@ print("\n----------------------------\nStart\n----------------------------")
 # # Tests
 # res = unit_test.test_make_IPO()
 # study_distribs()
+
+
+# mu = 0.15
+# scale = 0.1
+# r1 = np.random.normal(mu, scale, 1000)
+
+# params_1 = stats.norm.fit(r1)
+
+# x = np.linspace(mu - 10 * scale, mu + 10 * scale, 1000)
+
+# plt.plot(x, abs(0.05 + [stats.norm.pdf(x, *params_1)][0]))
+
+# plt.show()
 
 
 # Simulate stock exchange

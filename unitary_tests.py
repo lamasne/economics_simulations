@@ -1,9 +1,12 @@
 import pandas as pd
-from objects.animate.market import Market
 from objects.animate.investment_bank import InvestmentBank
-import meta.repository as repository
-import meta.globals as globals
+import db_interface.dao_MongoDB as dao_MongoDB
+import model_settings as model_settings
 from dynamics.main_fcts import *
+
+
+def test_match_making():
+    pass
 
 
 def test_make_IPO():
@@ -11,7 +14,9 @@ def test_make_IPO():
     ticker = "PEAR"
     companies = generate_companies(get_companies_df())
     shares = generate_shares(companies)
-    investors = generate_investors(globals.nb_investors, shares, companies).values()
+    investors = generate_investors(
+        model_settings.nb_investors, shares, companies
+    ).values()
     inv_banks = {
         name: InvestmentBank(name, 0, []) for name in ["Morgan Stanley"]
     }.values()
@@ -42,16 +47,16 @@ def test_insert_df():
     collection_name = ("companies",)
     data_df = pd.DataFrame(
         data={
-            "ticker": globals.tickers,
-            "profit_init": globals.profit_inits,
-            "market_cap_init": globals.market_cap_inits,
-            "nb_shares": globals.nb_shares_inits,
+            "ticker": model_settings.tickers,
+            "profit_init": model_settings.profit_inits,
+            "market_cap_init": model_settings.market_cap_inits,
+            "nb_shares": model_settings.nb_shares_inits,
         }
     )
 
     # Connect to collection
-    client = repository._get_client()
-    db = repository._get_db(client)
+    client = dao_MongoDB._get_client()
+    db = dao_MongoDB._get_db(client)
     collection = db[collection_name]
 
     def print_all_records(collection):
@@ -63,7 +68,7 @@ def test_insert_df():
     # Check data before insert
     records_before = print_all_records(collection)
     # Execute function to test
-    repository.insert_df(collection_name, data_df)
+    dao_MongoDB.insert_df(collection_name, data_df)
     # check data after insert
     records_after = print_all_records(collection)
 
@@ -77,3 +82,7 @@ def test_insert_df():
             "Test failed: all the records were not inserted (maybe some were updated?)\n"
         )
         return 0
+
+
+if __name__ == "__main__":
+    test_match_making()
