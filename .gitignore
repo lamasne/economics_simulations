@@ -1,3 +1,6 @@
+# MongoDB dump
+db_dump/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
