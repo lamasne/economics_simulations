@@ -1,5 +1,6 @@
 from unittest import expectedFailure
 import numpy as np
+import db_interface.investors_repo
 from objects.animate.company import Company
 import objects.animate.market  # Do not import class because of circular dependency
 from objects.inanimate.share import Share
@@ -17,8 +18,6 @@ class ValueInvestor(EA, Collectionable):
         available_money,
         blocked_money=None,
         id=None,
-        available_shares_fk=None,
-        blocked_shares_fk=None,
         accuracy=None,
         greediness=None,
     ):  # dont do shares_fk = [], it makes it the same default object for all instances -- https://stackoverflow.com/questions/4841782/python-constructor-and-default-value
@@ -26,12 +25,6 @@ class ValueInvestor(EA, Collectionable):
             available_money  # random between 10000 and 100000 maybe (or normal_dist/x)
         )
         self.blocked_money = blocked_money if blocked_money is not None else 0
-        self.available_shares_fk = (
-            available_shares_fk if available_shares_fk is not None else []
-        )
-        self.blocked_shares_fk = (
-            blocked_shares_fk if blocked_shares_fk is not None else []
-        )
         self.id = id
         self.accuracy = (
             accuracy
@@ -57,9 +50,13 @@ class ValueInvestor(EA, Collectionable):
         if self.available_money > (1 + self.greediness) * share_perceived_value:
             self.long(ticker, market, (1 - self.greediness) * share_perceived_value)
 
-        available_shares = Dao().read_objects(Share, self.available_shares_fk)
+        available_shares = db_interface.investors_repo.InvestorRepo().get_shares(
+            self.id
+        )
+        # available_shares = Dao().read_objects(Share, self.available_shares_fk)
+
         potential_share_to_sell = list(
-            filter(lambda share: share.ticker == ticker, available_shares.values())
+            filter(lambda share: share.ticker == ticker, available_shares)
         )
         if potential_share_to_sell:
             self.short(
@@ -77,34 +74,11 @@ class ValueInvestor(EA, Collectionable):
         # else:
         #     pass
 
-    def sell(self, share_fk, price, through_3rd_party=True):
-        if through_3rd_party:
-            self.blocked_shares_fk.remove(share_fk)
-        else:
-            self.available_shares_fk.remove(share_fk)
+    def exchange_money(self, price):
         self.available_money += price
+        if self.available_money < 0:
+            raise Exception("Allowed forbidden transaction")
         self.save()
-
-    def buy(self, share_fk, price, through_3rd_party=True):
-        if through_3rd_party:
-            if self.check_ability_to_pay(price, self.blocked_money):
-                self.blocked_money -= price
-                self.available_shares_fk.append(share_fk)
-                self.save()
-                return 1
-            else:
-                return 0
-        else:
-            if self.check_ability_to_pay(price, self.available_money):
-                self.available_money -= price
-                self.available_shares_fk.append(share_fk)
-                self.save()
-                return 1
-            else:
-                return 0
-
-    def check_ability_to_pay(self, price, money):
-        return False if price > money else True
 
     def long(self, ticker, market, price):
         market.process_bid(price, self, ticker)

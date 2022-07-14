@@ -1,3 +1,6 @@
+from audioop import avg
+from math import ceil
+import db_interface.investors_repo
 import db_interface.market_repo
 import sys
 import time
@@ -34,12 +37,8 @@ def simulate_exchange():
 
     # Initialize objects/parameters
     if not model_settings.is_import:
-        Dao().drop_db()
-        print("Dropped database")
         generate_init_state()
-
         # CREATE INDEX
-
         Dao().backup_db()
     else:
         Dao().restore_backup()
@@ -82,10 +81,15 @@ def generate_init_state():
     object_types = [Company, Market, Share, ValueInvestor, InvestmentBank]
 
     companies = generate_companies(get_companies_df())
+    print("Generated companies")
     markets = {"Nasdaq": Market(list(companies.keys()), "Nasdaq")}
+    print("Generated market")
     shares = generate_shares(companies)
+    print("Generated shares")
     investors = generate_investors(model_settings.nb_investors, shares, companies)
+    print("Generated investors")
     inv_banks = {name: InvestmentBank(name, 0, []) for name in ["Morgan Stanley"]}
+    print("Generated investment bank")
 
     df = pd.DataFrame(
         {
@@ -98,14 +102,15 @@ def generate_init_state():
     check_init_state(df["data"].to_list(), object_types)
 
     # Update data in db
-    db_interface = Dao()
-    db_interface.drop_db()
+    dao = Dao()
+    dao.drop_db()
     print("Dropped whole database")
-    for row in [df.iloc[idx] for idx in range(len(df.index))]:
-        db_interface.create_objects(
+    for row in list(df.to_dict(orient="index").values()):
+        dao.create_objects(
             row["object_type"],
             row["data"],
         )
+    print("Recreated whole database")
 
 
 def check_init_state(data_generated, data_to_generate):
@@ -208,10 +213,9 @@ def make_IPO():
     """
 
     # Import objects
-    db_interface = Dao()
-    company = db_interface.read_collection(Company)["PEAR"]
-    inv_banks = list(db_interface.read_collection(InvestmentBank).values())
-    investors = list(db_interface.read_collection(ValueInvestor).values())
+    dao = Dao()
+    company = dao.read_collection(Company)["PEAR"]
+    inv_banks = list(dao.read_collection(InvestmentBank).values())
 
     # 1
     inv_bank = random.choice(tuple(inv_banks))  # choose inv_bank
@@ -224,21 +228,12 @@ def make_IPO():
         Share(company.ticker + "_" + str(i), company.ticker)
         for i in range(potential_nb_shares)
     ]
-    db_interface.create_objects(Share, shares)
+    dao.create_objects(Share, shares)
 
     company.set_nb_shares(potential_nb_shares)
 
-    money_threshold_top_5 = np.percentile(
-        [investor.available_money for investor in investors], 95
-    )
-    print(f"money threshold to be part of the top 5 investors: {money_threshold_top_5}")
-    potential_investors = list(
-        filter(
-            lambda investor: investor.available_money >= money_threshold_top_5,
-            investors,
-        )
-    )
-
+    # get potential buyers
+    investors = db_interface.investors_repo.InvestorRepo().get_richest_investors()
     distribute_shares_randomly(shares, investors, price, company)
 
     print("IPO finished")
@@ -254,6 +249,9 @@ def distribute_shares_randomly(
         investor for investor in investors
     ]  # not just shares because I want to keep a copy of share
 
+    avg_nb_shares = ceil(len(shares) / len(investors))
+    print(f"Average number of shares per investor: {avg_nb_shares}")
+
     with alive_bar(len(undistributed_shares), title="Distribute shares to rich") as bar:
         while len(undistributed_shares) > 0:
             if len(unserved_investors) < 1:
@@ -262,22 +260,60 @@ def distribute_shares_randomly(
                 ]  # if all have been served, start again the round
             idx_interested_investor = random.randint(0, len(unserved_investors) - 1)
             interested_investor = unserved_investors[idx_interested_investor]
-            nb_shares_tmp = random.randint(0, 3)
-            if len(undistributed_shares) >= nb_shares_tmp:
-                for i in range(nb_shares_tmp):
-                    confirm_transaction = interested_investor.buy(
-                        undistributed_shares[0].id, price, through_3rd_party=False
-                    )
-                    if confirm_transaction:
-                        company.change_market_cap(price)
-                        undistributed_shares.remove(undistributed_shares[0])
-                        bar()
-                unserved_investors.remove(
-                    interested_investor
-                )  # to avoid giving the same investor the opportunity to buy too many shares
+            nb_shares_tmp = random.randint(0, 2 * avg_nb_shares)
+            if len(undistributed_shares) < nb_shares_tmp:
+                nb_shares_tmp = len(undistributed_shares)
+            for _ in range(nb_shares_tmp):
+                if interested_investor.available_money >= price:
+                    interested_investor.exchange_money(price)
+                    undistributed_shares[0].update_owner(interested_investor.id)
+                    company.change_market_cap(price)
+                    undistributed_shares.remove(undistributed_shares[0])
+                    bar()
+                else:
+                    # investor does not have enough money
+                    break
+            unserved_investors.remove(
+                interested_investor
+            )  # to avoid giving the same investor the opportunity to buy too many shares
 
     # print(len(undistributed_shares))
     # print(len(shares))
+
+
+# def distribute_shares_randomly(
+#     shares, investors, price, company
+# ):  # company should be imported from database
+#     undistributed_shares = [
+#         share for share in shares
+#     ]  # not just shares because I want to keep a copy of share
+#     unserved_investors = [
+#         investor for investor in investors
+#     ]  # not just shares because I want to keep a copy of share
+
+#     with alive_bar(len(undistributed_shares), title="Distribute shares to rich") as bar:
+#         while len(undistributed_shares) > 0:
+#             if len(unserved_investors) < 1:
+#                 unserved_investors = [
+#                     investor for investor in investors
+#                 ]  # if all have been served, start again the round
+#             idx_interested_investor = random.randint(0, len(unserved_investors) - 1)
+#             interested_investor = unserved_investors[idx_interested_investor]
+#             nb_shares_tmp = random.randint(0, 3)
+#             if len(undistributed_shares) < nb_shares_tmp:
+#                 nb_shares_tmp = len(undistributed_shares)
+#             for _ in range(nb_shares_tmp):
+#                 interested_investor.exchange_money(price)
+#                 undistributed_shares[0].update_owner(interested_investor.id)
+#                 company.change_market_cap(price)
+#                 undistributed_shares.remove(undistributed_shares[0])
+#                 bar()
+#             unserved_investors.remove(
+#                 interested_investor
+#             )  # to avoid giving the same investor the opportunity to buy too many shares
+
+#     # print(len(undistributed_shares))
+#     # print(len(shares))
 
 
 def get_news():

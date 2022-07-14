@@ -1,6 +1,7 @@
 import os
 import time
 import itertools
+from numpy import isin
 import pandas as pd
 from pymongo import MongoClient, UpdateOne
 import meta.meta_functions as meta_fcts
@@ -72,7 +73,6 @@ class Dao:
             collection = cls._db[col_name]
             df = pd.DataFrame(list(collection.find({})))
             df.drop("_id", axis=1, inplace=True)  # axis = 1 for column and not row
-
             # import foreign keys and make objects (call constructors)
             if is_fk_obj:
                 col_to_import = [
@@ -81,7 +81,7 @@ class Dao:
                 with alive_bar(
                     len(df.index), title=f"Importing data from {col_name}"
                 ) as bar:
-                    for row in [df.iloc[idx] for idx in range(len(df.index))]:
+                    for row in list(df.to_dict(orient="index").values()):
                         # If there is at least one, import secondary objects using foreign keys
                         if len(col_to_import) > 0:
                             params = cls.import_foreign_keys(row, col_to_import)
@@ -91,7 +91,7 @@ class Dao:
                         objects[row[key_id]] = class_to_init(**params)
                         bar()
             else:
-                for row in [df.iloc[idx] for idx in range(len(df.index))]:
+                for row in list(df.to_dict(orient="index").values()):
                     objects[row[key_id]] = class_to_init(**row)
 
         return objects
@@ -154,6 +154,8 @@ class Dao:
     def update_objects(cls, class_to_init, data, key_id="id", is_fk_obj=False):
         """
         updating is about a 100 times slower than inserting, so make sure that's necessary
+        inputs:
+        - data: either objects --> update all fields, or df/list_of_dict --> update specified fields
         """
         col_name = cls.class2col[class_to_init]
         data_df = cls.format_input_data(data)
@@ -164,24 +166,27 @@ class Dao:
         # print(
         #     f"Updating {len(data_df.index)} objects into collection: {col_name}.\nHave you considered using update_collection()?"
         # )
-        start = time.time()
+
+        # start = time.time()
         cls._db[col_name].bulk_write(
             [
                 UpdateOne(
-                    {key_id: object[key_id]},
+                    {key_id: dto[key_id]},
                     {
-                        "$set": object,
+                        "$set": dto,
                         # "$setOnInsert": object
                     },
                     upsert=True,
                 )
-                for object in formated_data
+                for dto in formated_data
             ]
         )
-        end = time.time()
+        # end = time.time()
+
         # print(f"Collection: {col_name} updated in {end-start:.2f} seconds")
 
     def delete_objects(cls, class_to_init, query, key_id="id"):
+
         # if list of id given, query makes match
         query = query if not isinstance(query, list) else {key_id: {"$in": query}}
         cls._db[cls.class2col[class_to_init]].delete_many(query)
@@ -313,6 +318,9 @@ class Dao:
                 for my_class in cls.col2class.values()
             ):
                 return pd.DataFrame.from_records([vars(object) for object in data_list])
+            # if list of dict
+            elif isinstance(data, list):
+                return pd.DataFrame.from_records(data)
 
         # If single object
         elif any(isinstance(data, my_class) for my_class in cls.col2class.values()):

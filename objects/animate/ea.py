@@ -8,9 +8,5 @@ class EA(ABC):
     #     pass
 
     @abstractmethod
-    def buy(self):
-        pass
-
-    @abstractmethod
-    def sell(self):
+    def exchange_money(price):
         pass

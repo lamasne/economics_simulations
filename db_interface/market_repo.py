@@ -1,12 +1,19 @@
 from db_interface.dao_MongoDB import Dao
 import objects.inanimate.order_buy
 import objects.inanimate.order_sell
+import objects.inanimate.share
 import objects.animate.market
 import pymongo
 import pandas as pd
 
 
 class MarketRepo:
+    def freeze_shares(cls, share_ids):
+        share_dto = [
+            {"id": share_id, "availability": False} for share_id in list(share_ids)
+        ]
+        Dao().update_objects(objects.inanimate.share.Share, share_dto)
+
     def create_index_match_making(cls):
         dao = Dao()
         dao._db[dao.class2col[objects.inanimate.order_sell.SellOrder]].create_index(
