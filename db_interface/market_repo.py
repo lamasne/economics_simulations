@@ -9,9 +9,7 @@ import pandas as pd
 
 class MarketRepo:
     def freeze_shares(cls, share_ids):
-        share_dto = [
-            {"id": share_id, "availability": False} for share_id in list(share_ids)
-        ]
+        share_dto = [{"id": share_id, "availability": False} for share_id in share_ids]
         Dao().update_objects(objects.inanimate.share.Share, share_dto)
 
     def create_index_match_making(cls):

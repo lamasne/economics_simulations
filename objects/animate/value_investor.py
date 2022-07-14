@@ -50,13 +50,14 @@ class ValueInvestor(EA, Collectionable):
         if self.available_money > (1 + self.greediness) * share_perceived_value:
             self.long(ticker, market, (1 - self.greediness) * share_perceived_value)
 
-        available_shares = db_interface.investors_repo.InvestorRepo().get_shares(
-            self.id
-        )
+        owned_shares = db_interface.investors_repo.InvestorRepo().get_shares(self.id)
         # available_shares = Dao().read_objects(Share, self.available_shares_fk)
 
         potential_share_to_sell = list(
-            filter(lambda share: share.ticker == ticker, available_shares)
+            filter(
+                lambda share: share.ticker == ticker and share.availability == True,
+                owned_shares,
+            )
         )
         if potential_share_to_sell:
             self.short(

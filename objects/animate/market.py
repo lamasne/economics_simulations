@@ -51,39 +51,79 @@ class Market(Collectionable):
 
         self.make_transactions(pd.DataFrame.from_records(transactions))
 
-    def make_transaction(
-        seller_fk, buyer_fk, share_fk, price, buy_order_fk, sell_order_fk
-    ):
-        """
-        for now one share by transaction
-        """
+    def make_transactions(self, data):
         dao = Dao()
-        seller = list(
-            dao.read_objects(
-                objects.animate.value_investor.ValueInvestor,
-                [seller_fk],
-            ).values()
-        )[0]
-        buyer = list(
-            dao.read_objects(
-                objects.animate.value_investor.ValueInvestor,
-                [buyer_fk],
-            ).values()
-        )[0]
-        share = list(
-            dao.read_objects(
-                Share,
-                [share_fk],
-            ).values()
-        )[0]
-        seller.exchange_money(price)
-        buyer.exchange_money(-price)
-        share.update_owner(buyer_fk)
+        # Import pojos
 
-        dao.delete_objects(BuyOrder, [buy_order_fk])
-        dao.delete_objects(SellOrder, [sell_order_fk])
+        # print(data.to_string())
 
-        # print(f'{buyer} bought {share} from {seller} for {price_s}')
+        sellers = dao.read_objects(
+            objects.animate.value_investor.ValueInvestor, data["seller_fk"].tolist()
+        )
+        buyers = dao.read_objects(
+            objects.animate.value_investor.ValueInvestor, data["buyer_fk"].tolist()
+        )
+        shares = dao.read_objects(Share, data["share_fk"].tolist())
+
+        # Iterate over transactions
+        for row in list(data.to_dict(orient="index").values()):
+            seller = sellers[row["seller_fk"]]
+            buyer = buyers[row["buyer_fk"]]
+            share = shares[row["share_fk"]]
+            price = row["price"]
+
+            if self.validate_transaction(seller, buyer, share, price):
+                seller.exchange_money(price)
+                buyer.blocked_money -= price
+                share.update_owner(row["buyer_fk"])
+                share.update_availability(True)
+            else:
+                print("Transaction cancelled")
+
+        dao.delete_objects(BuyOrder, data["buy_order_fk"].tolist())
+        dao.delete_objects(SellOrder, data["sell_order_fk"].tolist())
+
+    # def make_transaction(
+    #     self, seller_fk, buyer_fk, share_fk, price, buy_order_fk, sell_order_fk
+    # ):
+    #     """
+    #     for now one share by transaction
+    #     """
+    #     dao = Dao()
+    #     seller = list(
+    #         dao.read_objects(
+    #             objects.animate.value_investor.ValueInvestor,
+    #             [seller_fk],
+    #         ).values()
+    #     )[0]
+    #     buyer = list(
+    #         dao.read_objects(
+    #             objects.animate.value_investor.ValueInvestor,
+    #             [buyer_fk],
+    #         ).values()
+    #     )[0]
+    #     share = list(
+    #         dao.read_objects(
+    #             Share,
+    #             [share_fk],
+    #         ).values()
+    #     )[0]
+    #     self.validate_transaction(seller, buyer, share)
+    #     seller.exchange_money(price)
+    #     buyer.exchange_money(-price)
+    #     share.update_owner(buyer_fk)
+
+    #     dao.delete_objects(BuyOrder, [buy_order_fk])
+    #     dao.delete_objects(SellOrder, [sell_order_fk])
+
+    #     # print(f'{buyer} bought {share} from {seller} for {price_s}')
+
+    def validate_transaction(self, seller, buyer, share, price):
+        conditions = []
+        conditions.append(buyer.blocked_money >= price)
+        conditions.append(share.availability == False)  # THIS SHOULD NOT BE HERE
+        conditions.append(share.owner_fk == seller.id)
+        return True if all(conditions) else False
 
     def process_bid(self, bid, ea, ticker):
         if ea.available_money > bid:
@@ -92,17 +132,26 @@ class Market(Collectionable):
             new_order = BuyOrder(ticker, bid, ea.id, self.id)
             Dao().create_objects(BuyOrder, new_order)
             self.save()
+        else:
+            print("Buy order rejected for lack of funds")
 
     def process_ask(self, ask, ea, share):
         # relevant_shares = list(filter(lambda share : share.get_ticker() == ticker, ea.available_shares))
         if share:
-            # Block share
-            market_repo.MarketRepo().freeze_shares(share.id)
-            # Create sell order
-            new_order = SellOrder(share.ticker, ask, ea.id, self.id, share_fk=share.id)
-            Dao().create_objects(SellOrder, new_order)
-            # Update market
-            self.save()
+            if share.availability:
+                # Block share
+                market_repo.MarketRepo().freeze_shares([share.id])
+                # Create sell order
+                new_order = SellOrder(
+                    share.ticker, ask, ea.id, self.id, share_fk=share.id
+                )
+                Dao().create_objects(SellOrder, new_order)
+                # Update market
+                self.save()
+            else:
+                print(
+                    "Sell order rejected because one already exists for that share. Cancel the previous order first."
+                )
 
     def get_buy_price(self, ticker):
         supplies = market_repo.MarketRepo().query_ordered_supply(ticker, self.id)
@@ -155,23 +204,3 @@ class Market(Collectionable):
             demand = list(demand.values())
             supply = list(supply.values())
         return {"demand": demand, "supply": supply}
-
-    def make_transactions(self, data):
-        dao = Dao()
-        # import pojos
-        # print(data.to_string())
-        sellers = dao.read_objects(
-            objects.animate.value_investor.ValueInvestor, data["seller_fk"].tolist()
-        )
-        buyers = dao.read_objects(
-            objects.animate.value_investor.ValueInvestor, data["buyer_fk"].tolist()
-        )
-        shares = dao.read_objects(Share, data["share_fk"].tolist())
-
-        for row in list(data.to_dict(orient="index").values()):
-            sellers[row["seller_fk"]].exchange_money(row["price"])
-            buyers[row["buyer_fk"]].exchange_money(-row["price"])
-            shares[row["share_fk"]].update_owner(row["buyer_fk"])
-
-        dao.delete_objects(BuyOrder, data["buy_order_fk"].tolist())
-        dao.delete_objects(SellOrder, data["sell_order_fk"].tolist())
