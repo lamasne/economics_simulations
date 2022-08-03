@@ -6,13 +6,17 @@ import objects.animate.market  # Do not import class because of circular depende
 from objects.inanimate.share import Share
 from objects.collectionable import Collectionable
 from db_interface.dao_MongoDB import Dao
-from objects.animate.ea import EA
+from objects.animate.market_participant import MarketParticipant
 import model_settings as model_settings
 from math import sqrt
 from scipy.stats import skewnorm
 
 
-class ValueInvestor(EA, Collectionable):
+class ValueInvestor(MarketParticipant, Collectionable):
+    """
+    Market participants that place an buy order if the stock is undervalued and a sell order if it is overvalued
+    """
+
     def __init__(
         self,
         available_money,
@@ -48,7 +52,9 @@ class ValueInvestor(EA, Collectionable):
         ]
         share_perceived_value = self.get_perceived_value(news)
         if self.available_money > (1 + self.greediness) * share_perceived_value:
-            self.long(ticker, market, (1 - self.greediness) * share_perceived_value)
+            self.place_buy_limit_order(
+                ticker, market, (1 - self.greediness) * share_perceived_value
+            )
 
         owned_shares = db_interface.investors_repo.InvestorRepo().get_shares(self.id)
         # available_shares = Dao().read_objects(Share, self.available_shares_fk)
@@ -60,7 +66,7 @@ class ValueInvestor(EA, Collectionable):
             )
         )
         if potential_share_to_sell:
-            self.short(
+            self.place_sell_limit_order(
                 potential_share_to_sell[0],
                 market,
                 (1 + self.greediness) * share_perceived_value,
@@ -69,9 +75,9 @@ class ValueInvestor(EA, Collectionable):
         # if market.get_buy_price(ticker): # if someone interested in selling
         #     share_current_value = market.get_buy_price(ticker)
         #     if share_perceived_value > share_current_value:
-        #         self.long(ticker, market, (1-self.greediness)*share_perceived_value)
+        #         self.place_buy_limit_order(ticker, market, (1-self.greediness)*share_perceived_value)
         #     elif share_perceived_value < share_current_value:
-        #         self.short(ticker, market, (1+self.greediness)*share_perceived_value)
+        #         self.place_sell_limit_order(ticker, market, (1+self.greediness)*share_perceived_value)
         # else:
         #     pass
 
@@ -81,13 +87,11 @@ class ValueInvestor(EA, Collectionable):
             raise Exception("Allowed forbidden transaction")
         self.save()
 
-    def long(self, ticker, market, price):
-        market.process_bid(price, self, ticker)
-        self.save()
+    def place_buy_limit_order(self, ticker, market, price):
+        super().place_buy_limit_order(ticker, market, price)
 
-    def short(self, share, market, price):
-        market.process_ask(price, self, share)
-        self.save()
+    def place_sell_limit_order(self, share, market, price):
+        super().place_sell_limit_order(share, market, price)
 
     def get_perceived_value(self, news):
         ticker = news["ticker"]

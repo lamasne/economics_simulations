@@ -1,13 +1,12 @@
 import pandas as pd
-import numpy as np
 import seaborn as sns
-import objects.animate.value_investor  # Do not import class because of circular dependency
+import objects.animate.value_investor  # Should only be market participant + do not import class because of circular dependency
+import objects.animate.market_participant
 from objects.inanimate.order_buy import BuyOrder
 from objects.inanimate.order_sell import SellOrder
 from objects.inanimate.share import Share
 from objects.collectionable import Collectionable
 from db_interface.dao_MongoDB import Dao
-import model_settings as model_settings
 import db_interface.market_repo as market_repo
 
 
@@ -49,7 +48,8 @@ class Market(Collectionable):
                     # Orders must removed as it is not updated from table in the loop
                     supplies.remove(supply)
 
-        self.make_transactions(pd.DataFrame.from_records(transactions))
+        if len(transactions) > 0:
+            self.make_transactions(pd.DataFrame.from_records(transactions))
 
     def make_transactions(self, data):
         dao = Dao()
@@ -125,29 +125,32 @@ class Market(Collectionable):
         conditions.append(share.owner_fk == seller.id)
         return True if all(conditions) else False
 
-    def process_bid(self, bid, ea, ticker):
+    def process_bid(self, bid, ea_id, ticker):
+        ea = Dao().find_objects(objects.animate.value_investor.ValueInvestor, [ea_id])[
+            ea_id
+        ]
         if ea.available_money > bid:
+            # Should produce an event instead of modifying object
             ea.available_money -= bid
             ea.blocked_money += bid
+            ea.save()
             new_order = BuyOrder(ticker, bid, ea.id, self.id)
             Dao().create_objects(BuyOrder, new_order)
-            self.save()
         else:
             print("Buy order rejected for lack of funds")
 
-    def process_ask(self, ask, ea, share):
+    def process_ask(self, ask, ea_id, share_id):
         # relevant_shares = list(filter(lambda share : share.get_ticker() == ticker, ea.available_shares))
+        share = Dao().find_objects(Share, [share_id])[share_id]
         if share:
             if share.availability:
                 # Block share
                 market_repo.MarketRepo().freeze_shares([share.id])
                 # Create sell order
                 new_order = SellOrder(
-                    share.ticker, ask, ea.id, self.id, share_fk=share.id
+                    share.ticker, ask, ea_id, self.id, share_fk=share.id
                 )
                 Dao().create_objects(SellOrder, new_order)
-                # Update market
-                self.save()
             else:
                 print(
                     "Sell order rejected because one already exists for that share. Cancel the previous order first."

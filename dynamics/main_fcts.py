@@ -6,6 +6,7 @@ import sys
 import time
 import concurrent.futures  # multi threading/processing
 from db_interface.dao_MongoDB import Dao
+from dynamics.market_consumer import MarketConsumer
 import meta.meta_functions as meta_fcts
 from objects.animate.investment_bank import InvestmentBank
 from objects.animate.company import Company
@@ -35,42 +36,61 @@ def simulate_exchange():
         - timespan: for now it is the number of iterations
     """
 
-    # Initialize objects/parameters
-    if not model_settings.is_import:
-        generate_init_state()
-        # CREATE INDEX
-        Dao().backup_db()
-    else:
-        Dao().restore_backup()
+    initialize()
 
-    print("\n")
-
-    db_interface.market_repo.MarketRepo().create_index_match_making()
-
-    # Start with IPOs
     make_IPO()
-    # sys.exit()
 
-    # Simulate one day at a time
+    # Simulate one day at a time (or time delta?)
     for _ in range(model_settings.timespan):
+
+        ## If a potentially impactful news for the future of a company is made public, trigger traders
+        # Probability of such an event to occur - because there are 21 price jumps a year on avg according to: Lee, Suzanne S. "Jumps and information flow in financial markets." The Review of Financial Studies 25.2 (2012): 439-479.
+        # Note: the time at which the news is made public should be a distribution with higher probability at market closing (earnings, dividends, etc.)
+
+        # if random.randint(1, 365) <= 21:
         news_real_impact = get_news()
         print(f"FLASH NEWS: {news_real_impact}")
-
+        # Make investors react to news
         investors = Dao().read_collection(ValueInvestor)
         with alive_bar(len(investors), title="Get orders") as bar:
             for investor in investors.values():
                 investor.react_to_news(news_real_impact)
                 bar()
 
-        # For now focus on AAPL in Nasdaq because (studied news is about this ticker-market pair)
+        # 9:28 --> Nasdaq's opening cross, cf. https://money.howstuffworks.com/opening-closing-cross.htm + Nasdaq official doc
+
+        # For now focus on AAPL in Nasdaq (because studied news is about this ticker-market pair)
         market = Dao().read_objects(Market, ["Nasdaq"])["Nasdaq"]
         ticker = "AAPL"
 
-        market.make_bid_ask_plot()
         # t = pd.date_range(start=start_time, end='2022-10-13', periods=resolution).to_frame(index=False, name='Time')
+
+        # The matching (and ploting) shall be orders (matching) listeners probably
         market.match_bid_ask(ticker)
         print(f"Best price: {market.get_buy_price(ticker)}")
         market.make_bid_ask_plot()
+
+
+def initialize():
+
+    # Database and back-up
+    if not model_settings.is_import:
+        generate_init_state()
+        Dao().backup_db()
+    else:
+        Dao().restore_backup()
+    print("\n")
+    db_interface.market_repo.MarketRepo().create_index_match_making()
+
+    # Start event consumers (EDA)
+    try:
+        # Just one exchange for now (each might have its own consumer in the future)
+        td = MarketConsumer("Nasdaq")
+        td.start()
+    except Exception as e:
+        raise Exception(
+            "Unable to start thread that processes orders in market:\n" + str(e)
+        )
 
 
 def generate_init_state():
@@ -190,6 +210,8 @@ def generate_investors(nb_investors, shares, companies):
     )  # --> derivation in math_functions/invgauss_analysis
     # moneys_init = stats.invgauss.rvs(c=1, d=1, scale=scale, size=nb_investors)
 
+    print(f"Total money in the market: {sum(moneys_init)}")
+
     investors = [
         ValueInvestor(moneys_init[i], id=i) for i in range(nb_investors)
     ]  # init with no shares
@@ -261,6 +283,7 @@ def distribute_shares_randomly(
             idx_interested_investor = random.randint(0, len(unserved_investors) - 1)
             interested_investor = unserved_investors[idx_interested_investor]
             nb_shares_tmp = random.randint(0, 2 * avg_nb_shares)
+            # If there is not enough shares left to distribute, give max
             if len(undistributed_shares) < nb_shares_tmp:
                 nb_shares_tmp = len(undistributed_shares)
             for _ in range(nb_shares_tmp):
@@ -269,10 +292,10 @@ def distribute_shares_randomly(
                     undistributed_shares[0].update_owner(interested_investor.id)
                     company.change_market_cap(price)
                     undistributed_shares.remove(undistributed_shares[0])
-                    bar()
                 else:
                     # investor does not have enough money
                     break
+                bar()
             unserved_investors.remove(
                 interested_investor
             )  # to avoid giving the same investor the opportunity to buy too many shares

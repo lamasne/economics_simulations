@@ -1,10 +1,10 @@
-from objects.animate.ea import EA
+from objects.animate.market_participant import MarketParticipant
 from objects.collectionable import Collectionable
 from db_interface.dao_MongoDB import Dao
 import model_settings as model_settings
 
 
-class Company(Collectionable, EA):
+class Company(Collectionable, MarketParticipant):
     def __init__(self, ticker, profit, market_cap, nb_of_shares, capital, id=None):
         self.ticker = ticker
         self.id = id if id is not None else ticker
@@ -31,3 +31,9 @@ class Company(Collectionable, EA):
     def exchange_money(self, price):
         self.capital += price
         self.save()
+
+    def place_buy_limit_order(self, ticker, market, price):
+        super().place_buy_limit_order(ticker, market, price)
+
+    def place_sell_limit_order(self, share, market, price):
+        super().place_sell_limit_order(share, market, price)

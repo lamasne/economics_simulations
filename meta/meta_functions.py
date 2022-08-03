@@ -1,4 +1,3 @@
-import model_settings as model_settings
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt

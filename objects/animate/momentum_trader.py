@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
-from objects.animate.ea import EA
+from animate.market_participant import MarketParticipant
 
 
-class MomentumTrader(EA):
+class MomentumTrader(MarketParticipant):
     def __init__(self, shares_fk=None, id=None):
         self.id = id
         self.shares_fk = shares_fk if shares_fk is not None else []
