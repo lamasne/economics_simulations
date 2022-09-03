@@ -2,6 +2,7 @@ import json
 import abc
 from abc import ABC, abstractmethod
 import pika
+from meta_settings import RABBIT_MQ_HOST, PORT
 
 
 class MarketParticipant(ABC):
@@ -10,7 +11,6 @@ class MarketParticipant(ABC):
     #     pass
 
     def place_buy_limit_order(self, ticker, market, price):
-        RABBIT_MQ_HOST = "localhost"
         QUEUE_NAME = "orders_to_process"
 
         connection = pika.BlockingConnection(
@@ -37,7 +37,6 @@ class MarketParticipant(ABC):
         # self.save()
 
     def place_sell_limit_order(self, share, market, price):
-        RABBIT_MQ_HOST = "localhost"
         QUEUE_NAME = "orders_to_process"
 
         connection = pika.BlockingConnection(

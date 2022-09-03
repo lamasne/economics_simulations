@@ -3,8 +3,8 @@ from threading import Thread
 import objects.animate.market  # Do not import class because of circular dependency
 from db_interface.dao_MongoDB import Dao
 import pika
+from meta_settings import RABBIT_MQ_HOST, PORT
 
-RABBIT_MQ_HOST = "localhost"
 QUEUE_NAME = "orders_to_process"
 
 
@@ -15,7 +15,7 @@ class MarketConsumer(Thread):
 
         Thread.__init__(self)
         connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=RABBIT_MQ_HOST)
+            pika.ConnectionParameters(host=RABBIT_MQ_HOST)  # , port=PORT
         )
         self.channel = connection.channel()
         self.channel.queue_declare(queue=QUEUE_NAME, auto_delete=False)

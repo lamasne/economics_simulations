@@ -1,10 +1,12 @@
 import numpy as np
 from scipy import stats
+import time
 
 import pymongo
 import os
 import matplotlib.pyplot as plt
-import model_settings as model_settings
+import model_settings
+from meta_settings import outputs_folder
 
 # import unitary_tests as unit_test
 from dynamics.main_fcts import generate_init_state, simulate_exchange
@@ -26,31 +28,23 @@ To do:
 
 print("\n----------------------------\nStart\n----------------------------")
 
-
 # # Tests
 # res = unit_test.test_make_IPO()
 # study_distribs()
-
-
-# mu = 0.15
-# scale = 0.1
-# r1 = np.random.normal(mu, scale, 1000)
-# params_1 = stats.norm.fit(r1)
-# x = np.linspace(mu - 10 * scale, mu + 10 * scale, 1000)
-# plt.plot(x, abs(0.05 + [stats.norm.pdf(x, *params_1)][0]))
-# plt.show()
-
 
 # Simulate stock exchange
 simulate_exchange()
 
 # Print into pdf
-meta_fcts.multipage(
-    os.path.normpath(
-        "C:/Users/Lamas/workspace/PROJECTS/economics/simulation/outputs/multipage.pdf"
-    )
-)
-
+try:
+    meta_fcts.multipage(os.path.join(outputs_folder, "multipage.pdf"))
+except:
+    # if running from containers, copy to local machine
+    path_in_container = os.path.join(os.getcwd(), "multipage.pdf")
+    meta_fcts.multipage(path_in_container)
+    # docker.cp(path_in_container, outputs_folder)
+    print("go")
+    time.sleep(120)
 plt.show()
 
 print("End")
