@@ -2,7 +2,7 @@ import json
 import abc
 from abc import ABC, abstractmethod
 import pika
-from meta_settings import RABBIT_MQ_HOST, PORT
+from meta.settings.meta_settings import RABBIT_MQ_HOST, PORT
 
 
 class MarketParticipant(ABC):

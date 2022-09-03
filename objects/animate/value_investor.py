@@ -7,7 +7,7 @@ from objects.inanimate.share import Share
 from objects.collectionable import Collectionable
 from db_interface.dao_MongoDB import Dao
 from objects.animate.market_participant import MarketParticipant
-import model_settings as model_settings
+import meta.settings.model_settings as model_settings
 from math import sqrt
 from scipy.stats import skewnorm
 

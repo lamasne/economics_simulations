@@ -1,6 +1,6 @@
 import os
 
-import meta.meta_functions
+import meta.meta_functions as meta_functions
 import seaborn as sns
 from math import floor
 from alive_progress import alive_bar

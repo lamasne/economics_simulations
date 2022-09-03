@@ -6,8 +6,7 @@ import pandas as pd
 from pymongo import MongoClient, UpdateOne
 import meta.meta_functions as meta_fcts
 from alive_progress import alive_bar
-from . import settings_repo
-
+from meta.settings.meta_settings import MONGO_DB_SETTINGS
 
 # singleton to only open connection once
 class Dao:
@@ -44,17 +43,16 @@ class Dao:
             cls.class2col = {cls.col2class[col]: col for col in cls.col2class.keys()}
 
             # take care of DB connection settings
-            connection_settings = settings_repo.connection_settings
             cls._instance = super(Dao, cls).__new__(cls)
-            host = connection_settings["host"]
-            port = connection_settings["port"]
+            host = MONGO_DB_SETTINGS["host"]
+            port = MONGO_DB_SETTINGS["port"]
             try:
                 cls._client = MongoClient(host, port)
                 print("Created DB interface")
             except:
                 raise Exception("Could not connect to MongoDB")
 
-            db_name = connection_settings["db_name"]
+            db_name = MONGO_DB_SETTINGS["db_name"]
             cls._db = cls._client[db_name]
 
         return cls._instance
@@ -332,13 +330,13 @@ class Dao:
         """copy db_name to /db_dump"""
         os.system(
             "mongodump --db="
-            + settings_repo.connection_settings["db_name"]
+            + MONGO_DB_SETTINGS["db_name"]
             + " --out=db_dump"
         )
 
     def restore_backup(cls):
         """copy db_backup into db_name"""
-        settings = settings_repo.connection_settings
+        settings = MONGO_DB_SETTINGS
         cls._client.drop_database(settings["db_name"])
         print("Dropped database")
         os.system(
@@ -353,4 +351,4 @@ class Dao:
         )
 
     def drop_db(cls):
-        cls._client.drop_database(settings_repo.connection_settings["db_name"])
+        cls._client.drop_database(MONGO_DB_SETTINGS["db_name"])

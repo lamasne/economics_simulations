@@ -5,12 +5,12 @@ import time
 import pymongo
 import os
 import matplotlib.pyplot as plt
-import model_settings
-from meta_settings import outputs_folder
+import meta.settings.model_settings as model_settings
+from meta.settings.meta_settings import outputs_folder
 
 # import unitary_tests as unit_test
 from dynamics.main_fcts import generate_init_state, simulate_exchange
-from meta.math_functions import study_distribs
+from testing.math_functions import study_distribs
 import meta.meta_functions as meta_fcts
 
 """

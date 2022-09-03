@@ -1,7 +1,9 @@
 version: '3'
 services:
   eco_sim:
-    build: .
+    build:
+      context: .
+      dockerfile: ./meta/Dockerfile
     stdin_open: true # interactive terminal (does it work?)
     ports:
       - "8000:8000"

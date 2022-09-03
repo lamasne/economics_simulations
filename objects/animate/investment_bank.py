@@ -1,7 +1,7 @@
 from math import floor
 from scipy import stats
 
-import model_settings as model_settings
+import meta.settings.model_settings as model_settings
 from objects.collectionable import Collectionable
 
 # should implement EA or company maybe?

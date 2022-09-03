@@ -13,7 +13,7 @@ from objects.animate.company import Company
 from objects.animate.market import Market
 from objects.inanimate.share import Share
 from objects.animate.value_investor import ValueInvestor
-import model_settings as model_settings
+import meta.settings.model_settings as model_settings
 import numpy as np
 import pandas as pd
 import random

@@ -1,7 +1,7 @@
 from objects.animate.market_participant import MarketParticipant
 from objects.collectionable import Collectionable
 from db_interface.dao_MongoDB import Dao
-import model_settings as model_settings
+import meta.settings.model_settings as model_settings
 
 
 class Company(Collectionable, MarketParticipant):

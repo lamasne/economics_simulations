@@ -3,7 +3,7 @@ from threading import Thread
 import objects.animate.market  # Do not import class because of circular dependency
 from db_interface.dao_MongoDB import Dao
 import pika
-from meta_settings import RABBIT_MQ_HOST, PORT
+from meta.settings.meta_settings import RABBIT_MQ_HOST, PORT
 
 QUEUE_NAME = "orders_to_process"
 
