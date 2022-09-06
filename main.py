@@ -43,7 +43,7 @@ except:
     path_in_container = os.path.join(os.getcwd(), "multipage.pdf")
     meta_fcts.multipage(path_in_container)
     # docker.cp(path_in_container, outputs_folder)
-    print("go")
+    print("go copy multipage.pdf (2 minutes to do so) cf. readme")
     time.sleep(120)
 plt.show()
 
