@@ -6,7 +6,7 @@ from objects.inanimate.order_buy import BuyOrder
 from objects.inanimate.order_sell import SellOrder
 from objects.inanimate.share import Share
 from objects.collectionable import Collectionable
-from db_interface.dao_MongoDB import Dao
+from dao_pymongo.dao import Dao
 import db_interface.market_repo as market_repo
 
 

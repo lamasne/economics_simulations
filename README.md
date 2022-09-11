@@ -3,15 +3,18 @@ For documentation cf. folder documentation
 
 A) run the code on your machine: 
     1) Directly on local machine:
-    - create a venv with requirements from requirements.txt (obtained via pip3 freeze > requirements.txt)
+    - create a venv with requirements from meta/settings/requirements.txt (obtained via pip3 freeze > requirements.txt)
+    - change is_local_run from meta/settings/meta_settings to 1
     - run an instance of MongoDB and match host:port with meta_settings relevant vars
     - run an instance of RabbitMQ and match host:port with meta_settings relevant vars
     - run python main
 
     2) As a single container:
-        docker-compose up --build
-    if get errors:
-        docker-compose -f docker-compose.yaml up --build --remove-orphans --force-recreate
+        - change is_local_run from meta/settings/meta_settings to 0
+        - run:
+            docker-compose up --build
+            if get errors:
+                docker-compose -f docker-compose.yaml up --build --remove-orphans --force-recreate
 
     3) as various containers (to check):
         docker build app -d

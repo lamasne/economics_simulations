@@ -1,4 +1,4 @@
-from db_interface.dao_MongoDB import Dao
+from dao_pymongo.dao import Dao
 import objects.inanimate.order_buy
 import objects.inanimate.order_sell
 import objects.inanimate.share

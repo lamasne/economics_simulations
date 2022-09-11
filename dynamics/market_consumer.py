@@ -1,7 +1,7 @@
 import json
 from threading import Thread
 import objects.animate.market  # Do not import class because of circular dependency
-from db_interface.dao_MongoDB import Dao
+from dao_pymongo.dao import Dao
 import pika
 from meta.settings.meta_settings import RABBIT_MQ_HOST, PORT
 

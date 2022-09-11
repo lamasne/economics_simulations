@@ -1,4 +1,4 @@
-from db_interface.dao_MongoDB import Dao
+from dao_pymongo.dao import Dao
 import objects.animate.value_investor
 import objects.inanimate.share
 import numpy as np

@@ -1,4 +1,4 @@
-from db_interface.dao_MongoDB import Dao
+from dao_pymongo.dao import Dao
 
 
 class Collectionable:

@@ -5,7 +5,7 @@ import db_interface.market_repo
 import sys
 import time
 import concurrent.futures  # multi threading/processing
-from db_interface.dao_MongoDB import Dao
+from dao_pymongo.dao import Dao
 from dynamics.market_consumer import MarketConsumer
 import meta.meta_functions as meta_fcts
 from objects.animate.investment_bank import InvestmentBank

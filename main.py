@@ -6,12 +6,16 @@ import pymongo
 import os
 import matplotlib.pyplot as plt
 import meta.settings.model_settings as model_settings
-from meta.settings.meta_settings import outputs_folder
+from meta.settings.meta_settings import outputs_folder, MONGO_DB_SETTINGS
 
 # import unitary_tests as unit_test
 from dynamics.main_fcts import generate_init_state, simulate_exchange
 from testing.math_functions import study_distribs
 import meta.meta_functions as meta_fcts
+
+from meta.settings.db_obj_map import col2class
+from dao_pymongo.dao import Dao
+from dao_pymongo.meta_functions import test_installation
 
 """
 Documentation in folder ./documentation
@@ -32,7 +36,10 @@ print("\n----------------------------\nStart\n----------------------------")
 # res = unit_test.test_make_IPO()
 # study_distribs()
 
-# Simulate stock exchange
+# Initialize dao
+Dao(MONGO_DB_SETTINGS, col2class)
+
+# Start simulation
 simulate_exchange()
 
 # Print into pdf
@@ -48,7 +55,6 @@ except:
 plt.show()
 
 print("End")
-
 
 # # Momentum trades
 # x = np.linspace(0, resolution, resolution)
