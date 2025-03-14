@@ -1,32 +1,57 @@
-# economics_simulations
-For documentation cf. folder documentation
+# Economics Simulations
 
-A) run the code on your machine: 
-    1) Directly on local machine:
-    - create a venv with requirements from meta/settings/requirements.txt (obtained via pip3 freeze > requirements.txt)
-    - change is_local_run from meta/settings/meta_settings to 1
-    - run an instance of MongoDB and match host:port with meta_settings relevant vars
-    - run an instance of RabbitMQ and match host:port with meta_settings relevant vars
-    - run python main
+## Documentation  
+Refer to the `documentation` folder for detailed information.  
 
-    2) As a single container:
-        - change is_local_run from meta/settings/meta_settings to 0
-        - run:
-            docker-compose up --build
-            if get errors:
-                docker-compose -f docker-compose.yaml up --build --remove-orphans --force-recreate
+## A) Running the Code on Your Machine  
 
-    3) as various containers (to check):
-        docker build app -d
-        docker run -it app_image
+### 1) Directly on Local Machine  
+- Create a virtual environment and install dependencies. For instance, in a Windows powershell (e.g. from within VScode):
+  ```sh
+  python3 -m venv venv
+  source venv/Scripts/activate
+  pip install -r meta/settings/requirements.txt
+  ```
+- Set `is_local_run = 1` in `meta/settings/meta_settings`.  
+- Run an instance of **MongoDB** and match `host:port` with `meta_settings` variables.  
+- Run an instance of **RabbitMQ** and match `host:port` with `meta_settings` variables.  
+- Start the application:  
+  ```sh
+  python main.py
+  ```
 
-B) Debugg code:
-    1) acces container files:
-        docker exec -it container_id sh
-    2) copy file from container to local machine (only while container is running)
-        docker cp trunk-eco_sim-1:/home/econ_simul/multipage.pdf .
+### 2) As a Single Docker Container  
+- Set `is_local_run = 0` in `meta/settings/meta_settings`.  
+- Run:  
+  ```sh
+  docker-compose up --build
+  ```
+  **If errors occur:**  
+  ```sh
+  docker-compose -f docker-compose.yaml up --build --remove-orphans --force-recreate
+  ```
 
-C) Mantain the code:
-    1) Clean requirements: 
-        (does not seem to work)
-        pip-extra-reqs main.py db_interface dynamics meta objects
+### 3) As Multiple Containers (to check)  
+```sh
+docker build app -d
+docker run -it app_image
+```
+
+## B) Debugging Code  
+
+### 1) Access Container Files  
+```sh
+docker exec -it <container_id> sh
+```
+
+### 2) Copy File from Container to Local Machine (while running)  
+```sh
+docker cp trunk-eco_sim-1:/home/econ_simul/multipage.pdf .
+```
+
+## C) Maintaining the Code  
+
+### 1) Clean Requirements (Not Fully Functional)  
+```sh
+pip-extra-reqs main.py db_interface dynamics meta objects
+```
