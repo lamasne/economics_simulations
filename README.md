@@ -1,7 +1,7 @@
 # Economics Simulations
 
 ## Documentation  
-Refer to the `documentation` folder for detailed information.  
+Refer to latex file for detailed information (private access).
 
 ## A) Running the Code on Your Machine  
 
